@@ -53,6 +53,27 @@ class Settings(BaseSettings):
         return self.app_env.lower() == "production"
 
 
+def get_setting_from_db(key: str, fallback: str = "") -> str:
+    """Lee una setting desde public.system_settings.
+
+    Si la DB no tiene el registro (aún no migró) o hay error, devuelve el
+    fallback (que suele venir de env var). Silencioso — nunca rompe requests.
+    """
+    try:
+        from app.database import get_db
+        with get_db() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT value FROM public.system_settings WHERE key = %s LIMIT 1;",
+                (key,),
+            )
+            row = cur.fetchone()
+            if row and row["value"]:
+                return row["value"]
+    except Exception:
+        pass
+    return fallback
+
+
 @lru_cache
 def get_settings() -> Settings:
     return Settings()

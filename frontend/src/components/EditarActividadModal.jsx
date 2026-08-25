@@ -115,7 +115,7 @@ export default function EditarActividadModal({ actividadId, onClose, onSaved, ca
             <div className="text-xs text-slate-500 space-y-0.5">
               <div>Trabajador: <strong className="text-slate-800">{meta?.trabajador_nombre}</strong></div>
               <div>Fecha: <strong className="text-slate-800">{meta?.fecactividad}</strong></div>
-              <div>CC: {meta?.centro_costo_nombre || '—'} · Proyecto: {meta?.proyecto_nombre || '—'}</div>
+              <div>Centro de Costo: {meta?.centro_costo_nombre || '—'} · Proyecto: {meta?.proyecto_nombre || '—'}</div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

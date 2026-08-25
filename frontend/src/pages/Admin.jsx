@@ -1,18 +1,24 @@
 import { useState } from 'react'
 
 import { adminApi } from '../api/admin'
+import AdminGeneral from '../components/AdminGeneral.jsx'
 import AdminMasterTable from '../components/AdminMasterTable.jsx'
+import AdminPermisos from '../components/AdminPermisos.jsx'
+import AdminSettings from '../components/AdminSettings.jsx'
 import AdminTrabajadores from '../components/AdminTrabajadores.jsx'
 import AdminUsuarios from '../components/AdminUsuarios.jsx'
 
 const TABS = [
-  { id: 'trabajadores', label: 'Trabajadores' },
-  { id: 'usuarios', label: 'Usuarios' },
-  { id: 'categorias', label: 'Categorías' },
-  { id: 'areas', label: 'Áreas' },
-  { id: 'especialidades', label: 'Especialidades' },
-  { id: 'centros', label: 'Centros de costo' },
-  { id: 'proyectos', label: 'Proyectos' },
+  { id: 'general', label: 'General', group: 'Empresa' },
+  { id: 'marca', label: 'Marca / Config', group: 'Empresa' },
+  { id: 'trabajadores', label: 'Trabajadores', group: 'Equipo' },
+  { id: 'usuarios', label: 'Usuarios', group: 'Equipo' },
+  { id: 'permisos', label: 'Roles y permisos', group: 'Equipo' },
+  { id: 'categorias', label: 'Categorías', group: 'Catálogos' },
+  { id: 'areas', label: 'Áreas', group: 'Catálogos' },
+  { id: 'especialidades', label: 'Especialidades', group: 'Catálogos' },
+  { id: 'centros', label: 'Centros de costo', group: 'Catálogos' },
+  { id: 'proyectos', label: 'Proyectos', group: 'Catálogos' },
 ]
 
 // Configs declarativas por master (menos código, cero duplicación).
@@ -147,38 +153,63 @@ const categoriasConfig = {
 }
 
 export default function Admin() {
-  const [tab, setTab] = useState('trabajadores')
+  const [tab, setTab] = useState('general')
+
+  // Agrupar tabs por sección (sidebar-like) para claridad
+  const groups = TABS.reduce((acc, t) => {
+    acc[t.group] = acc[t.group] || []
+    acc[t.group].push(t)
+    return acc
+  }, {})
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Administración</h1>
-        <p className="text-slate-500 text-sm">Gestión de trabajadores, usuarios y catálogos.</p>
+        <p className="text-slate-500 text-sm">
+          Gestión de configuración, equipo y catálogos maestros.
+        </p>
       </div>
 
-      <div className="border-b border-slate-200 flex gap-2 overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
-              tab === t.id
-                ? 'border-brand-600 text-brand-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-5">
+        <aside className="space-y-4">
+          {Object.entries(groups).map(([groupName, ts]) => (
+            <div key={groupName}>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 px-3 mb-1">
+                {groupName}
+              </div>
+              <div className="space-y-0.5">
+                {ts.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`w-full text-left px-3 py-1.5 rounded-md text-sm transition-colors ${
+                      tab === t.id
+                        ? 'bg-brand-600 text-white font-medium'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </aside>
 
-      {tab === 'trabajadores' && <AdminTrabajadores />}
-      {tab === 'usuarios' && <AdminUsuarios />}
-      {tab === 'categorias' && <AdminMasterTable {...categoriasConfig} />}
-      {tab === 'areas' && <AdminMasterTable {...areasConfig} />}
-      {tab === 'especialidades' && <AdminMasterTable {...especialidadesConfig} />}
-      {tab === 'centros' && <AdminMasterTable {...centrosConfig} />}
-      {tab === 'proyectos' && <AdminMasterTable {...proyectosConfig} />}
+        <section>
+          {tab === 'general' && <AdminGeneral />}
+          {tab === 'marca' && <AdminSettings />}
+          {tab === 'trabajadores' && <AdminTrabajadores />}
+          {tab === 'usuarios' && <AdminUsuarios />}
+          {tab === 'permisos' && <AdminPermisos />}
+          {tab === 'categorias' && <AdminMasterTable {...categoriasConfig} />}
+          {tab === 'areas' && <AdminMasterTable {...areasConfig} />}
+          {tab === 'especialidades' && <AdminMasterTable {...especialidadesConfig} />}
+          {tab === 'centros' && <AdminMasterTable {...centrosConfig} />}
+          {tab === 'proyectos' && <AdminMasterTable {...proyectosConfig} />}
+        </section>
+      </div>
     </div>
   )
 }

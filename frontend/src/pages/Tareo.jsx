@@ -258,7 +258,7 @@ export default function Tareo() {
                       Inicio {fmtHM(a.horinicio)} · Fin {fmtHM(a.horfin)} · {minutosToHoras(a.numduracionminuto)}
                     </span>
                     {a.centro_costo_nombre && (
-                      <span className="text-xs text-slate-500 truncate">CC: {a.centro_costo_nombre}</span>
+                      <span className="text-xs text-slate-500 truncate">Centro de Costo: {a.centro_costo_nombre}</span>
                     )}
                   </div>
                 </div>

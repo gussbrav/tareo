@@ -1,4 +1,4 @@
-"""Endpoints de reportes: KPIs y export Excel formato asistencia."""
+"""Endpoints de reportes: KPIs, dashboard v2 y export Excel formato asistencia."""
 from datetime import date, datetime, time, timedelta
 from io import BytesIO
 from typing import Optional
@@ -40,6 +40,33 @@ def kpis(
         "por_semana": repo.horas_por_semana(d, h),
         "por_centro_costo": repo.horas_por_centro_costo(d, h),
     }
+
+
+@router.get("/dashboard")
+def dashboard(
+    desde: date | None = Query(default=None),
+    hasta: date | None = Query(default=None),
+    proyecto_id: Optional[UUID] = Query(default=None),
+    area_id: Optional[UUID] = Query(default=None),
+    categoria_id: Optional[UUID] = Query(default=None),
+    _: UserPublic = Depends(get_current_user),
+):
+    """Payload completo para el Dashboard v2.
+
+    Un solo round-trip con KPIs + delta período anterior + tendencia diaria
+    + top trabajadores + por categoría + por CC + heatmap + alertas + catálogos.
+    """
+    d, h = _default_range()
+    d = desde or d
+    h = hasta or h
+    payload = repo.dashboard_completo(
+        d, h,
+        proyecto_id=proyecto_id,
+        area_id=area_id,
+        categoria_id=categoria_id,
+    )
+    payload["rango"] = {"desde": d.isoformat(), "hasta": h.isoformat()}
+    return payload
 
 
 def _to_time(v) -> Optional[time]:
