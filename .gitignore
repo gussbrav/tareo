@@ -45,6 +45,11 @@ Thumbs.db
 # Docker
 .docker/
 
+# Mobile build outputs (grandes, van via Releases/canal aparte)
+*.apk
+*.aab
+mobile/android/local.properties
+
 # Logs / temp
 *.log
 tmp/
