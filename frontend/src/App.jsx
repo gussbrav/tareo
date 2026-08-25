@@ -4,6 +4,7 @@ import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import NuevaActividad from './pages/NuevaActividad.jsx'
 import Tareo from './pages/Tareo.jsx'
+import Admin from './pages/Admin.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import AppShell from './components/AppShell.jsx'
 
@@ -27,6 +28,14 @@ export default function App() {
           element={
             <RequireAuth roles={['admin', 'supervisor']}>
               <NuevaActividad />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <RequireAuth roles={['admin']}>
+              <Admin />
             </RequireAuth>
           }
         />

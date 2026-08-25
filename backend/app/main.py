@@ -9,13 +9,15 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.auth.router import router as auth_router
-from app.bootstrap import ensure_initial_admin
+from app.bootstrap import ensure_demo_users, ensure_initial_admin
 from app.config import get_settings
 from app.database import close_pool, init_pool
 from app.db_migrator import apply_all as apply_migrations
 from app.routers.actividades import router as actividades_router
+from app.routers.admin import router as admin_router
 from app.routers.catalogos import router as catalogos_router
 from app.routers.health import router as health_router
+from app.routers.reportes import router as reportes_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +33,7 @@ async def lifespan(app: FastAPI):
     init_pool()
     apply_migrations()
     ensure_initial_admin()
+    ensure_demo_users()
     logger.info("Ready.")
     yield
     close_pool()
@@ -61,6 +64,8 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(catalogos_router)
     app.include_router(actividades_router)
+    app.include_router(reportes_router)
+    app.include_router(admin_router)
 
     # En prod servimos el bundle del frontend desde /static y catch-all a index.html
     static_dir = Path(__file__).resolve().parent.parent / "static"

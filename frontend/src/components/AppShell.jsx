@@ -25,6 +25,7 @@ export default function AppShell() {
   }
 
   const canCreate = user?.role === 'admin' || user?.role === 'supervisor'
+  const isAdmin = user?.role === 'admin'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -56,6 +57,14 @@ export default function AppShell() {
               >
                 Dashboard
               </NavLink>
+              {isAdmin && (
+                <NavLink
+                  to="/admin"
+                  className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}
+                >
+                  Admin
+                </NavLink>
+              )}
             </nav>
           </div>
 
@@ -89,6 +98,14 @@ export default function AppShell() {
           >
             Dashboard
           </NavLink>
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}
+            >
+              Admin
+            </NavLink>
+          )}
         </div>
       </header>
 

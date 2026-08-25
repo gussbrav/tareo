@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 
 import { actividadesApi } from '../api/actividades'
 import { today, fmtHM, minutosToHoras } from '../lib/format'
+import { useAuthStore } from '../store/auth'
+import EditarActividadModal from '../components/EditarActividadModal.jsx'
 
 const estadoStyles = {
   iniciado: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -11,16 +13,22 @@ const estadoStyles = {
 
 export default function Tareo() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const isTrabajador = user?.role === 'trabajador'
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor'
+
   const [fecha, setFecha] = useState(today())
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState(() => new Set())
+  const [editing, setEditing] = useState(null)
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
 
   const load = () => {
     setLoading(true)
+    setError('')
     actividadesApi
       .listar(fecha)
       .then((data) => {
@@ -64,7 +72,7 @@ export default function Tareo() {
     }
   }
 
-  const finalize = async () => {
+  const finalizeBatch = async () => {
     setError('')
     setMsg('')
     const ids = Array.from(selected).filter((id) =>
@@ -83,6 +91,75 @@ export default function Tareo() {
     }
   }
 
+  const finalizeOne = async (id) => {
+    setError('')
+    setMsg('')
+    try {
+      const res = await actividadesApi.finalizarUna(id)
+      if (res.updated > 0) setMsg('Actividad finalizada')
+      load()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'No se pudo finalizar')
+    }
+  }
+
+  // ---------- Vista trabajador (UI simplificada) ----------
+  if (isTrabajador) {
+    return (
+      <div className="space-y-5 max-w-2xl mx-auto">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Mis tareas</h1>
+          <p className="text-slate-500 text-sm">
+            Hola {user?.first_name || 'trabajador'}, estas son tus asignaciones.
+          </p>
+        </div>
+
+        <div className="card">
+          <label className="label">Fecha</label>
+          <input type="date" className="input" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        </div>
+
+        {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>}
+        {msg && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-3 py-2">{msg}</div>}
+
+        {loading ? (
+          <p className="text-slate-500 text-sm">Cargando…</p>
+        ) : filtered.length === 0 ? (
+          <div className="card text-slate-500 text-sm text-center">
+            No tienes tareas asignadas para esta fecha.
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {filtered.map((a) => (
+              <li key={a.id} className="card space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className={`inline-block text-xs px-2 py-0.5 rounded border ${estadoStyles[a.desestadoactividad] || ''}`}>
+                      {a.desestadoactividad}
+                    </span>
+                    <p className="mt-2 text-lg font-medium text-slate-900">{a.desactividad}</p>
+                  </div>
+                  <span className="text-xs text-slate-400 shrink-0">{a.fecdia_display}</span>
+                </div>
+                <div className="text-sm text-slate-500 space-y-0.5">
+                  <div>Inicio: <span className="text-slate-800 font-medium">{fmtHM(a.horinicio)}</span></div>
+                  <div>Fin: <span className="text-slate-800 font-medium">{fmtHM(a.horfin)}</span> · Duración: {minutosToHoras(a.numduracionminuto)}</div>
+                  {a.centro_costo_nombre && <div>Centro costo: {a.centro_costo_nombre}</div>}
+                </div>
+                {a.desestadoactividad === 'iniciado' && (
+                  <button onClick={() => finalizeOne(a.id)} className="btn-primary w-full text-base py-3">
+                    Finalizar tarea
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )
+  }
+
+  // ---------- Vista admin / supervisor ----------
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -122,23 +199,13 @@ export default function Tareo() {
             />
             Seleccionar todas las iniciadas
           </label>
-          <button
-            className="btn-primary"
-            onClick={finalize}
-            disabled={selected.size === 0}
-          >
+          <button className="btn-primary" onClick={finalizeBatch} disabled={selected.size === 0}>
             Finalizar {selected.size > 0 ? `(${selected.size})` : ''}
           </button>
         </div>
 
-        {error && (
-          <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>
-        )}
-        {msg && (
-          <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-3 py-2">
-            {msg}
-          </div>
-        )}
+        {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>}
+        {msg && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-3 py-2">{msg}</div>}
       </div>
 
       {loading ? (
@@ -169,7 +236,18 @@ export default function Tareo() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-semibold text-slate-900 truncate">{a.trabajador_nombre}</p>
-                    <span className="text-xs text-slate-400 shrink-0">{a.fecdia_display}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-slate-400">{a.fecdia_display}</span>
+                      {canEdit && (
+                        <button
+                          onClick={() => setEditing(a.id)}
+                          className="text-xs text-brand-600 hover:text-brand-700 font-medium"
+                          title="Editar / Mantenimiento"
+                        >
+                          Editar
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-sm text-slate-700 mt-1 break-words">{a.desactividad}</p>
                   <div className="mt-2 flex flex-wrap gap-2 items-center">
@@ -188,6 +266,18 @@ export default function Tareo() {
             )
           })}
         </ul>
+      )}
+
+      {editing && (
+        <EditarActividadModal
+          actividadId={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null)
+            load()
+          }}
+          canDelete={user?.role === 'admin'}
+        />
       )}
     </div>
   )
