@@ -5,13 +5,14 @@ import { adminApi } from '../api/admin'
 const EMPTY = {
   nbrcompleto: '',
   numidentificacion: '',
-  descategoriatrabajador: '',
+  categoria_id: '',
   desestadotrabajador: 'activo',
   flgativotrabajador: true,
 }
 
 export default function AdminTrabajadores() {
   const [items, setItems] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
@@ -19,40 +20,37 @@ export default function AdminTrabajadores() {
 
   const load = () => {
     setLoading(true)
-    adminApi.trabajadores.list().then(setItems).finally(() => setLoading(false))
+    Promise.all([adminApi.trabajadores.list(), adminApi.categorias.list()])
+      .then(([ts, cs]) => {
+        setItems(ts)
+        setCategorias(cs.filter((c) => c.flgactivocategoria))
+      })
+      .finally(() => setLoading(false))
   }
   useEffect(load, [])
 
-  const openNew = () => {
-    setEditing('new')
-    setForm(EMPTY)
-    setError('')
-  }
+  const openNew = () => { setEditing('new'); setForm(EMPTY); setError('') }
   const openEdit = (t) => {
     setEditing(t.id)
     setForm({
       nbrcompleto: t.nbrcompleto || '',
       numidentificacion: t.numidentificacion || '',
-      descategoriatrabajador: t.descategoriatrabajador || '',
+      categoria_id: t.categoria_id || '',
       desestadotrabajador: t.desestadotrabajador || 'activo',
       flgativotrabajador: t.flgativotrabajador,
     })
     setError('')
   }
-  const close = () => {
-    setEditing(null)
-    setError('')
-  }
+  const close = () => { setEditing(null); setError('') }
 
   const submit = async (e) => {
     e.preventDefault()
     setError('')
     try {
-      if (editing === 'new') {
-        await adminApi.trabajadores.create(form)
-      } else {
-        await adminApi.trabajadores.update(editing, form)
-      }
+      const payload = { ...form }
+      if (!payload.categoria_id) delete payload.categoria_id
+      if (editing === 'new') await adminApi.trabajadores.create(payload)
+      else await adminApi.trabajadores.update(editing, payload)
       close()
       load()
     } catch (err) {
@@ -92,7 +90,7 @@ export default function AdminTrabajadores() {
                 <tr key={t.id}>
                   <td className="py-2 text-slate-900">{t.nbrcompleto}</td>
                   <td className="py-2 text-slate-600">{t.numidentificacion || '—'}</td>
-                  <td className="py-2 text-slate-600">{t.descategoriatrabajador || '—'}</td>
+                  <td className="py-2 text-slate-600">{t.categoria_nombre || t.descategoriatrabajador || '—'}</td>
                   <td className="py-2">
                     <span className={`text-xs px-2 py-0.5 rounded ${
                       t.flgativotrabajador ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -102,12 +100,8 @@ export default function AdminTrabajadores() {
                     </span>
                   </td>
                   <td className="py-2 text-right">
-                    <button className="text-brand-600 hover:text-brand-700 text-xs mr-3" onClick={() => openEdit(t)}>
-                      Editar
-                    </button>
-                    <button className="text-red-600 hover:text-red-700 text-xs" onClick={() => del(t.id, t.nbrcompleto)}>
-                      Desactivar
-                    </button>
+                    <button className="text-brand-600 hover:text-brand-700 text-xs mr-3" onClick={() => openEdit(t)}>Editar</button>
+                    <button className="text-red-600 hover:text-red-700 text-xs" onClick={() => del(t.id, t.nbrcompleto)}>Desactivar</button>
                   </td>
                 </tr>
               ))}
@@ -141,9 +135,16 @@ export default function AdminTrabajadores() {
               </div>
               <div>
                 <label className="label">Categoría</label>
-                <input className="input" value={form.descategoriatrabajador}
-                       onChange={(e) => setForm({ ...form, descategoriatrabajador: e.target.value })}
-                       placeholder="Operario, Supervisor, Ayudante..." />
+                <select className="input" value={form.categoria_id}
+                        onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}>
+                  <option value="">— Sin categoría —</option>
+                  {categorias.map((c) => (
+                    <option key={c.id} value={c.id}>{c.codcategoria} · {c.nbrcategoria}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-1">
+                  Si falta la categoría, agregala en la tab "Categorías".
+                </p>
               </div>
               <div>
                 <label className="label">Estado</label>

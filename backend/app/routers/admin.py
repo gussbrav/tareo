@@ -1,5 +1,5 @@
-"""Admin panel: CRUD de trabajadores y usuarios. Solo rol admin."""
-from typing import List, Optional
+"""Admin panel: CRUD de trabajadores, usuarios y catálogos maestros. Solo rol admin."""
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,7 +9,11 @@ from app.auth.dependencies import require_role
 from app.auth.password import hash_password
 from app.database import get_db
 
-router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_role("admin"))])
+router = APIRouter(
+    prefix="/api/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_role("admin"))],
+)
 
 
 # ============================================================
@@ -19,7 +23,8 @@ router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(re
 class TrabajadorCreate(BaseModel):
     nbrcompleto: str = Field(..., min_length=1, max_length=255)
     numidentificacion: Optional[str] = Field(default=None, max_length=50)
-    descategoriatrabajador: Optional[str] = Field(default=None, max_length=100)
+    categoria_id: Optional[UUID] = None
+    descategoriatrabajador: Optional[str] = Field(default=None, max_length=100)  # legacy free-text
     desestadotrabajador: str = Field(default="activo", max_length=100)
     flgativotrabajador: bool = True
 
@@ -27,6 +32,7 @@ class TrabajadorCreate(BaseModel):
 class TrabajadorUpdate(BaseModel):
     nbrcompleto: Optional[str] = Field(default=None, min_length=1, max_length=255)
     numidentificacion: Optional[str] = Field(default=None, max_length=50)
+    categoria_id: Optional[UUID] = None
     descategoriatrabajador: Optional[str] = Field(default=None, max_length=100)
     desestadotrabajador: Optional[str] = Field(default=None, max_length=100)
     flgativotrabajador: Optional[bool] = None
@@ -36,7 +42,12 @@ class TrabajadorUpdate(BaseModel):
 def list_trabajadores():
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(
-            "SELECT * FROM construccion.m_trabajador ORDER BY nbrcompleto;"
+            """
+            SELECT t.*, c.nbrcategoria AS categoria_nombre
+              FROM construccion.m_trabajador t
+              LEFT JOIN construccion.m_categoria_trabajador c ON c.id = t.categoria_id
+             ORDER BY t.nbrcompleto;
+            """
         )
         return [dict(r) for r in cur.fetchall()]
 
@@ -47,14 +58,15 @@ def create_trabajador(payload: TrabajadorCreate):
         cur.execute(
             """
             INSERT INTO construccion.m_trabajador
-                (nbrcompleto, numidentificacion, descategoriatrabajador,
+                (nbrcompleto, numidentificacion, categoria_id, descategoriatrabajador,
                  desestadotrabajador, flgativotrabajador)
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING *;
             """,
             (
                 payload.nbrcompleto.strip().upper(),
                 payload.numidentificacion,
+                str(payload.categoria_id) if payload.categoria_id else None,
                 payload.descategoriatrabajador,
                 payload.desestadotrabajador,
                 payload.flgativotrabajador,
@@ -70,6 +82,8 @@ def update_trabajador(trabajador_id: UUID, payload: TrabajadorUpdate):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Sin cambios")
     if "nbrcompleto" in data:
         data["nbrcompleto"] = data["nbrcompleto"].strip().upper()
+    if "categoria_id" in data and data["categoria_id"] is not None:
+        data["categoria_id"] = str(data["categoria_id"])
     sets = ", ".join(f"{k} = %s" for k in data)
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(
@@ -84,7 +98,7 @@ def update_trabajador(trabajador_id: UUID, payload: TrabajadorUpdate):
 
 @router.delete("/trabajadores/{trabajador_id}", status_code=204)
 def delete_trabajador(trabajador_id: UUID):
-    """Soft-delete: marca como inactivo. Mantiene FK con actividades históricas."""
+    """Soft-delete: mantiene FK con actividades históricas."""
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -102,9 +116,6 @@ def delete_trabajador(trabajador_id: UUID):
 # ============================================================
 # Usuarios
 # ============================================================
-
-Role = str  # validado abajo
-
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -197,8 +208,256 @@ def update_user(user_id: UUID, payload: UserUpdate):
 
 @router.delete("/usuarios/{user_id}", status_code=204)
 def delete_user(user_id: UUID):
-    """Soft-delete: desactiva. Preserva integridad con audit de sesiones/actividades."""
+    """Soft-delete: desactiva."""
     with get_db() as conn, conn.cursor() as cur:
         cur.execute("UPDATE auth.users SET is_active = false WHERE id = %s;", (str(user_id),))
         if cur.rowcount == 0:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Usuario no encontrado")
+
+
+# ============================================================
+# Catálogos maestros — CRUD genérico DRY
+# ============================================================
+
+class AreaCreate(BaseModel):
+    codarea: str = Field(..., min_length=1, max_length=30)
+    nbrarea: str = Field(..., min_length=1, max_length=255)
+    flgactivoarea: bool = True
+
+
+class AreaUpdate(BaseModel):
+    codarea: Optional[str] = Field(default=None, min_length=1, max_length=30)
+    nbrarea: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    flgactivoarea: Optional[bool] = None
+
+
+class EspecialidadCreate(BaseModel):
+    codespecialidad: str = Field(..., min_length=1, max_length=10)
+    nbrespecialidad: str = Field(..., min_length=1, max_length=255)
+    area_id: UUID
+    flgactivoespecialidad: bool = True
+
+
+class EspecialidadUpdate(BaseModel):
+    codespecialidad: Optional[str] = Field(default=None, min_length=1, max_length=10)
+    nbrespecialidad: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    area_id: Optional[UUID] = None
+    flgactivoespecialidad: Optional[bool] = None
+
+
+class CentroCostoCreate(BaseModel):
+    codcentrocosto: str = Field(..., min_length=1, max_length=10)
+    nbrcentrocosto: str = Field(..., min_length=1, max_length=255)
+    especialidad_id: UUID
+    codigo_ceco: Optional[str] = Field(default=None, max_length=50)
+    tipocentrocosto: Optional[str] = Field(default=None, max_length=50)
+    flgactivocentrocosto: bool = True
+
+
+class CentroCostoUpdate(BaseModel):
+    codcentrocosto: Optional[str] = Field(default=None, min_length=1, max_length=10)
+    nbrcentrocosto: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    especialidad_id: Optional[UUID] = None
+    codigo_ceco: Optional[str] = Field(default=None, max_length=50)
+    tipocentrocosto: Optional[str] = Field(default=None, max_length=50)
+    flgactivocentrocosto: Optional[bool] = None
+
+
+class ProyectoCreate(BaseModel):
+    codproyecto: int
+    descontratoproyecto: Optional[str] = Field(default=None, max_length=100)
+    nbrproyecto: Optional[str] = Field(default=None, max_length=255)
+    cliproyecto: Optional[str] = Field(default=None, max_length=255)
+    desproyecto: Optional[str] = None
+    flgactivoproyecto: bool = True
+
+
+class ProyectoUpdate(BaseModel):
+    codproyecto: Optional[int] = None
+    descontratoproyecto: Optional[str] = Field(default=None, max_length=100)
+    nbrproyecto: Optional[str] = Field(default=None, max_length=255)
+    cliproyecto: Optional[str] = Field(default=None, max_length=255)
+    desproyecto: Optional[str] = None
+    flgactivoproyecto: Optional[bool] = None
+
+
+class CategoriaCreate(BaseModel):
+    codcategoria: str = Field(..., min_length=1, max_length=30)
+    nbrcategoria: str = Field(..., min_length=1, max_length=120)
+    flgactivocategoria: bool = True
+
+
+class CategoriaUpdate(BaseModel):
+    codcategoria: Optional[str] = Field(default=None, min_length=1, max_length=30)
+    nbrcategoria: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    flgactivocategoria: Optional[bool] = None
+
+
+# ---------- helper genérico ----------
+def _crud_list(table: str, order_by: str) -> list:
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(f"SELECT * FROM {table} ORDER BY {order_by};")
+        return [dict(r) for r in cur.fetchall()]
+
+
+def _crud_insert(table: str, data: dict) -> dict:
+    cols = ", ".join(data.keys())
+    ph = ", ".join(["%s"] * len(data))
+    values = tuple(str(v) if hasattr(v, 'hex') else v for v in data.values())
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(f"INSERT INTO {table} ({cols}) VALUES ({ph}) RETURNING *;", values)
+        return dict(cur.fetchone())
+
+
+def _crud_update(table: str, id_: UUID, data: dict) -> dict:
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Sin cambios")
+    for k, v in list(data.items()):
+        if hasattr(v, 'hex'):  # UUID
+            data[k] = str(v)
+    sets = ", ".join(f"{k} = %s" for k in data)
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE {table} SET {sets} WHERE id = %s RETURNING *;",
+            (*data.values(), str(id_)),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Registro no encontrado")
+        return dict(row)
+
+
+def _crud_soft_delete(table: str, id_: UUID, flag_col: str) -> None:
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(f"UPDATE {table} SET {flag_col} = false WHERE id = %s;", (str(id_),))
+        if cur.rowcount == 0:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Registro no encontrado")
+
+
+# ---------- Áreas ----------
+
+@router.get("/areas")
+def list_areas():
+    return _crud_list("construccion.m_area", "codarea")
+
+
+@router.post("/areas", status_code=201)
+def create_area(payload: AreaCreate):
+    return _crud_insert("construccion.m_area", payload.model_dump())
+
+
+@router.patch("/areas/{area_id}")
+def update_area(area_id: UUID, payload: AreaUpdate):
+    return _crud_update("construccion.m_area", area_id, payload.model_dump(exclude_none=True))
+
+
+@router.delete("/areas/{area_id}", status_code=204)
+def delete_area(area_id: UUID):
+    _crud_soft_delete("construccion.m_area", area_id, "flgactivoarea")
+
+
+# ---------- Especialidades ----------
+
+@router.get("/especialidades")
+def list_especialidades():
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT e.*, a.nbrarea AS area_nombre
+              FROM construccion.m_especialidad e
+              LEFT JOIN construccion.m_area a ON a.id = e.area_id
+             ORDER BY a.nbrarea, e.codespecialidad;
+            """
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
+@router.post("/especialidades", status_code=201)
+def create_especialidad(payload: EspecialidadCreate):
+    return _crud_insert("construccion.m_especialidad", payload.model_dump())
+
+
+@router.patch("/especialidades/{esp_id}")
+def update_especialidad(esp_id: UUID, payload: EspecialidadUpdate):
+    return _crud_update("construccion.m_especialidad", esp_id, payload.model_dump(exclude_none=True))
+
+
+@router.delete("/especialidades/{esp_id}", status_code=204)
+def delete_especialidad(esp_id: UUID):
+    _crud_soft_delete("construccion.m_especialidad", esp_id, "flgactivoespecialidad")
+
+
+# ---------- Centros de costo ----------
+
+@router.get("/centros-costo")
+def list_centros_costo():
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT cc.*, e.nbrespecialidad AS especialidad_nombre, a.nbrarea AS area_nombre
+              FROM construccion.m_centrocosto cc
+              LEFT JOIN construccion.m_especialidad e ON e.id = cc.especialidad_id
+              LEFT JOIN construccion.m_area a ON a.id = e.area_id
+             ORDER BY a.nbrarea, e.nbrespecialidad, cc.codcentrocosto;
+            """
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
+@router.post("/centros-costo", status_code=201)
+def create_centro_costo(payload: CentroCostoCreate):
+    return _crud_insert("construccion.m_centrocosto", payload.model_dump())
+
+
+@router.patch("/centros-costo/{cc_id}")
+def update_centro_costo(cc_id: UUID, payload: CentroCostoUpdate):
+    return _crud_update("construccion.m_centrocosto", cc_id, payload.model_dump(exclude_none=True))
+
+
+@router.delete("/centros-costo/{cc_id}", status_code=204)
+def delete_centro_costo(cc_id: UUID):
+    _crud_soft_delete("construccion.m_centrocosto", cc_id, "flgactivocentrocosto")
+
+
+# ---------- Proyectos ----------
+
+@router.get("/proyectos")
+def list_proyectos():
+    return _crud_list("construccion.m_proyecto", "codproyecto")
+
+
+@router.post("/proyectos", status_code=201)
+def create_proyecto(payload: ProyectoCreate):
+    return _crud_insert("construccion.m_proyecto", payload.model_dump())
+
+
+@router.patch("/proyectos/{proy_id}")
+def update_proyecto(proy_id: UUID, payload: ProyectoUpdate):
+    return _crud_update("construccion.m_proyecto", proy_id, payload.model_dump(exclude_none=True))
+
+
+@router.delete("/proyectos/{proy_id}", status_code=204)
+def delete_proyecto(proy_id: UUID):
+    _crud_soft_delete("construccion.m_proyecto", proy_id, "flgactivoproyecto")
+
+
+# ---------- Categorías de trabajador ----------
+
+@router.get("/categorias")
+def list_categorias():
+    return _crud_list("construccion.m_categoria_trabajador", "codcategoria")
+
+
+@router.post("/categorias", status_code=201)
+def create_categoria(payload: CategoriaCreate):
+    return _crud_insert("construccion.m_categoria_trabajador", payload.model_dump())
+
+
+@router.patch("/categorias/{cat_id}")
+def update_categoria(cat_id: UUID, payload: CategoriaUpdate):
+    return _crud_update("construccion.m_categoria_trabajador", cat_id, payload.model_dump(exclude_none=True))
+
+
+@router.delete("/categorias/{cat_id}", status_code=204)
+def delete_categoria(cat_id: UUID):
+    _crud_soft_delete("construccion.m_categoria_trabajador", cat_id, "flgactivocategoria")

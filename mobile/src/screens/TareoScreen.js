@@ -35,6 +35,7 @@ export default function TareoScreen({ navigation }) {
   const [error, setError] = useState('')
 
   const canCreate = user?.role === 'admin' || user?.role === 'supervisor'
+  const canEdit = user?.role === 'admin' || user?.role === 'supervisor'
 
   const load = useCallback(async () => {
     setError('')
@@ -102,7 +103,14 @@ export default function TareoScreen({ navigation }) {
             <View style={styles.card}>
               <View style={styles.rowBetween}>
                 <Text style={styles.trabajador}>{item.trabajador_nombre}</Text>
-                <Text style={styles.date}>{item.fecdia_display}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Text style={styles.date}>{item.fecdia_display}</Text>
+                  {canEdit && (
+                    <TouchableOpacity onPress={() => navigation.navigate('EditarActividad', { actividadId: item.id })}>
+                      <Text style={styles.editLink}>Editar</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
               <Text style={styles.desc} numberOfLines={3}>{item.desactividad}</Text>
               <View style={styles.meta}>
@@ -168,6 +176,7 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   trabajador: { fontSize: 15, fontWeight: '600', color: colors.slate[900], flex: 1 },
   date: { fontSize: 12, color: colors.slate[400] },
+  editLink: { fontSize: 12, color: colors.brand[600], fontWeight: '600' },
   desc: { fontSize: 14, color: colors.slate[700], marginTop: 6 },
   meta: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 10, flexWrap: 'wrap' },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
