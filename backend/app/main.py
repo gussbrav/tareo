@@ -13,6 +13,8 @@ from app.bootstrap import ensure_initial_admin
 from app.config import get_settings
 from app.database import close_pool, init_pool
 from app.db_migrator import apply_all as apply_migrations
+from app.routers.actividades import router as actividades_router
+from app.routers.catalogos import router as catalogos_router
 from app.routers.health import router as health_router
 
 logging.basicConfig(
@@ -57,6 +59,8 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(catalogos_router)
+    app.include_router(actividades_router)
 
     # En prod servimos el bundle del frontend desde /static y catch-all a index.html
     static_dir = Path(__file__).resolve().parent.parent / "static"
