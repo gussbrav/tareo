@@ -33,6 +33,12 @@ class Settings(BaseSettings):
 
     allowed_origins: str = "http://localhost:5173"
 
+    # Branding del cliente (aparece en reportes/exports).
+    company_name: str = "Azoramind Tareo"
+    company_taxid: str = ""
+    report_daily_hours: float = 8.0
+    report_lunch_minutes: int = 60
+
     @field_validator("allowed_origins")
     @classmethod
     def _strip_origins(cls, v: str) -> str:
