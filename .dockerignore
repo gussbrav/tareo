@@ -1,0 +1,21 @@
+# No enviar basura al build context
+**/node_modules
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+frontend/dist
+backend/static
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+!README.md
+tests/
+docs/
+_tmp/

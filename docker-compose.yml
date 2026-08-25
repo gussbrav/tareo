@@ -1,0 +1,61 @@
+# ============================================================
+# Docker Compose — desarrollo local (no producción).
+# Levanta Postgres local + backend con hot-reload + frontend Vite dev.
+# Para prod usar el Dockerfile de la raíz y EasyPanel.
+# ============================================================
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: tareo_dev
+      POSTGRES_PASSWORD: tareo_dev
+      POSTGRES_DB: azoramind_tareo
+    ports:
+      - "5432:5432"
+    volumes:
+      - tareo_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tareo_dev -d azoramind_tareo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: python:3.12-slim
+    working_dir: /app/backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://tareo_dev:tareo_dev@postgres:5432/azoramind_tareo?sslmode=disable
+      JWT_SECRET_KEY: dev_only_secret_change_me_dev_only_secret_change_me
+      APP_ENV: development
+      APP_DEBUG: "true"
+      ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      INITIAL_ADMIN_EMAIL: admin@azoramind.com
+      INITIAL_ADMIN_PASSWORD: admin123
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app/backend
+    command: >
+      bash -c "apt-get update && apt-get install -y --no-install-recommends libpq5 &&
+               pip install --no-cache-dir -r requirements.txt &&
+               uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
+
+volumes:
+  tareo_pg_data:
