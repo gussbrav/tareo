@@ -140,10 +140,9 @@ export default function AdminPermisos() {
       <div className="card">
         <h2 className="font-semibold text-slate-900 mb-1">Roles y permisos</h2>
         <p className="text-sm text-slate-500">
-          Los cambios se aplican en tiempo real. El backend recibe cada toggle y actualiza la
-          matriz en <code className="text-xs bg-slate-100 px-1 rounded">auth.role_permissions</code>.
-          Nada está hardcodeado — puedes desactivar una capability para un rol y su UI + endpoint
-          responderán 403 al instante (con TTL de cache de 60s).
+          Define qué puede hacer cada tipo de usuario. Marca o desmarca las acciones y
+          los cambios se guardan al instante. La próxima vez que el usuario intente hacer
+          esa acción, verá el nuevo comportamiento (puede tardar hasta 1 minuto en aplicarse).
         </p>
         <div className="flex flex-wrap gap-2 mt-3">
           {ROLES.map((r) => (
