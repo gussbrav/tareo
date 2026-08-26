@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Azoramind Tareo — Cotización de Implementación</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    color: #0F172A;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  :root {
+    --brand-50: #EFF4FF;
+    --brand-100: #DBE7FE;
+    --brand-500: #3B65F5;
+    --brand-600: #1E40AF;
+    --brand-700: #1E3A8A;
+    --brand-900: #1B2A5C;
+    --gold: #D9A518;
+    --gold-light: #F5C542;
+    --slate-50: #F8FAFC;
+    --slate-100: #F1F5F9;
+    --slate-200: #E2E8F0;
+    --slate-400: #94A3B8;
+    --slate-500: #64748B;
+    --slate-700: #334155;
+    --slate-900: #0F172A;
+    --emerald: #059669;
+    --emerald-50: #ECFDF5;
+    --emerald-500: #10B981;
+  }
+
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding: 18mm 18mm;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+    background: white;
+  }
+  .page:last-child { page-break-after: auto; }
+  .page-num {
+    position: absolute;
+    bottom: 10mm;
+    right: 18mm;
+    font-size: 8.5pt;
+    color: var(--slate-400);
+    letter-spacing: 0.05em;
+  }
+  .page-foot {
+    position: absolute;
+    bottom: 10mm;
+    left: 18mm;
+    font-size: 8.5pt;
+    color: var(--slate-400);
+  }
+
+  /* ─── Header bar en todas las páginas menos portada ────── */
+  .doc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--slate-200);
+  }
+  .doc-header-brand { display: flex; align-items: center; gap: 10px; }
+  .doc-header-logo {
+    width: 32px; height: 32px; border-radius: 6px;
+    background: white; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--slate-200);
+  }
+  .doc-header-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .doc-header-name { font-size: 11pt; font-weight: 700; color: var(--slate-900); letter-spacing: 0.02em; }
+  .doc-header-meta { font-size: 8.5pt; color: var(--slate-500); text-align: right; }
+  .doc-header-meta strong { color: var(--slate-900); }
+
+  /* ─── Portada ─────────────────────────────────────────── */
+  .cover {
+    background: linear-gradient(135deg, #1E40AF 0%, #1B2A5C 100%);
+    color: white;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .cover-hero { padding: 35mm 20mm 0 20mm; position: relative; }
+  .cover-brand {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 55mm;
+  }
+  .cover-logo {
+    width: 52px; height: 52px; border-radius: 10px;
+    background: white; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cover-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .cover-brand-name { font-size: 14pt; font-weight: 600; letter-spacing: 0.02em; }
+  .cover-eyebrow {
+    font-size: 11pt; font-weight: 600; color: var(--gold-light);
+    letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 14px;
+  }
+  .cover-title {
+    font-size: 46pt; font-weight: 800; line-height: 1.05;
+    letter-spacing: -0.02em; margin-bottom: 14px;
+  }
+  .cover-subtitle {
+    font-size: 14pt; font-weight: 400; line-height: 1.4;
+    color: rgba(255,255,255,0.75); max-width: 140mm; margin-bottom: 30px;
+  }
+  .cover-meta-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 20px 40px; margin-top: 30px; max-width: 130mm;
+  }
+  .cover-meta-label {
+    font-size: 9pt; color: rgba(255,255,255,0.5);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px;
+  }
+  .cover-meta-value { font-size: 12pt; font-weight: 600; color: white; }
+  .cover-meta-value.gold { color: var(--gold-light); }
+  .cover-decoration {
+    position: absolute; right: -50mm; top: 30mm;
+    width: 200mm; height: 200mm;
+    background: radial-gradient(circle, rgba(217,165,24,0.15) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .cover-foot {
+    padding: 18mm 20mm; display: flex; justify-content: space-between;
+    align-items: flex-end; color: rgba(255,255,255,0.7); font-size: 9.5pt;
+    border-top: 1px solid rgba(255,255,255,0.15);
+  }
+
+  /* ─── Sections ─────────────────────────────────────────── */
+  .section-eyebrow {
+    font-size: 8.5pt; font-weight: 700; color: var(--gold);
+    letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 6px;
+  }
+  h1.section-title {
+    font-size: 22pt; font-weight: 800; color: var(--slate-900);
+    line-height: 1.15; letter-spacing: -0.015em; margin-bottom: 8px;
+  }
+  h2.subsection-title {
+    font-size: 13pt; font-weight: 700; color: var(--slate-900);
+    margin: 20px 0 8px 0; letter-spacing: -0.01em;
+  }
+  .divider {
+    height: 2.5px; width: 40px; background: var(--gold);
+    margin: 12px 0 16px 0;
+  }
+  .lead {
+    font-size: 10.5pt; line-height: 1.55; color: var(--slate-500);
+    max-width: 155mm; margin-bottom: 14px;
+  }
+  p { font-size: 10pt; line-height: 1.55; color: var(--slate-700); margin-bottom: 8px; }
+  strong { color: var(--slate-900); font-weight: 700; }
+
+  ul { list-style: none; }
+  li {
+    font-size: 10pt; line-height: 1.45; color: var(--slate-700);
+    padding-left: 18px; position: relative; margin-bottom: 5px;
+  }
+  li::before {
+    content: ''; position: absolute; left: 0; top: 7px;
+    width: 5px; height: 5px; background: var(--brand-600); border-radius: 999px;
+  }
+  li.check::before {
+    background: var(--emerald); width: 5px; height: 5px;
+  }
+
+  /* ─── Plans grid ────────────────────────────────────────── */
+  .plans {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 16px 0;
+  }
+  .plan {
+    border: 1px solid var(--slate-200);
+    border-radius: 12px;
+    padding: 16px 14px 14px 14px;
+    page-break-inside: avoid;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    position: relative;
+  }
+  .plan.featured {
+    border: 2px solid var(--brand-600);
+    box-shadow: 0 8px 20px -8px rgba(30,64,175,0.25);
+  }
+  .plan-badge {
+    position: absolute; top: -10px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--brand-600); color: white;
+    font-size: 8pt; font-weight: 700; letter-spacing: 0.1em;
+    padding: 3px 10px; border-radius: 999px; text-transform: uppercase;
+  }
+  .plan-name {
+    font-size: 13pt; font-weight: 700; color: var(--slate-900);
+    letter-spacing: -0.01em;
+  }
+  .plan-size {
+    font-size: 8.5pt; color: var(--slate-500); margin-top: 3px;
+    text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;
+  }
+  .plan-price {
+    margin-top: 12px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--slate-100);
+  }
+  .plan-price-amount {
+    font-size: 24pt; font-weight: 800; color: var(--brand-700);
+    letter-spacing: -0.02em; line-height: 1; tabular-nums: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .plan-price-cadence {
+    font-size: 9pt; color: var(--slate-500); margin-top: 2px;
+  }
+  .plan-setup {
+    font-size: 9pt; color: var(--slate-600); margin-top: 6px;
+  }
+  .plan-setup strong { color: var(--gold); }
+  .plan-features { margin-top: 10px; flex: 1; }
+  .plan-features li {
+    font-size: 9pt; line-height: 1.4; padding-left: 15px;
+    margin-bottom: 4px;
+  }
+  .plan-features li::before {
+    background: var(--emerald); width: 4px; height: 4px; top: 7px;
+  }
+
+  /* ─── Includes / Info table ─────────────────────────────── */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin: 10px 0 4px 0;
+  }
+  .info-card {
+    background: var(--slate-50);
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    padding: 12px 14px;
+    page-break-inside: avoid;
+  }
+  .info-card-title {
+    font-size: 10pt; font-weight: 700; color: var(--slate-900);
+    margin-bottom: 6px;
+  }
+  .info-card-title.gold { color: var(--gold); }
+  .info-card ul li {
+    font-size: 9.5pt; padding-left: 14px; margin-bottom: 3px; line-height: 1.4;
+  }
+  .info-card ul li::before {
+    background: var(--emerald); width: 4px; height: 4px; top: 6px;
+  }
+
+  /* ─── Timeline ──────────────────────────────────────────── */
+  .timeline {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 12px 0;
+    position: relative;
+  }
+  .timeline::before {
+    content: ''; position: absolute;
+    top: 14px; left: 24px; right: 24px; height: 2px;
+    background: var(--brand-100); z-index: 0;
+  }
+  .tl-step { position: relative; z-index: 1; text-align: center; page-break-inside: avoid; }
+  .tl-num {
+    width: 30px; height: 30px; border-radius: 999px;
+    background: var(--brand-600); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 12pt; margin: 0 auto 8px auto;
+  }
+  .tl-title { font-size: 10pt; font-weight: 700; color: var(--slate-900); margin-bottom: 4px; }
+  .tl-week { font-size: 8.5pt; color: var(--gold); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .tl-desc { font-size: 9pt; color: var(--slate-500); line-height: 1.4; }
+
+  /* ─── Terms box ─────────────────────────────────────────── */
+  .terms-box {
+    background: var(--slate-50);
+    border-left: 3px solid var(--gold);
+    padding: 14px 18px;
+    border-radius: 6px;
+    margin: 14px 0;
+    page-break-inside: avoid;
+  }
+  .terms-box p { font-size: 9.5pt; margin-bottom: 6px; }
+  .terms-box p:last-child { margin-bottom: 0; }
+
+  /* ─── Total table ───────────────────────────────────────── */
+  .total-tbl {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 12px 0;
+    font-size: 10pt;
+  }
+  .total-tbl th, .total-tbl td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--slate-200);
+    text-align: left;
+  }
+  .total-tbl th {
+    font-size: 8.5pt; font-weight: 700; color: var(--slate-500);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    background: var(--slate-50);
+    border-top: 1px solid var(--slate-200);
+  }
+  .total-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .total-tbl tr.total-row td {
+    border-top: 2px solid var(--brand-600); border-bottom: none;
+    font-weight: 800; font-size: 12pt; color: var(--brand-700);
+    background: var(--brand-50);
+  }
+  .total-tbl tr.total-row td.num { color: var(--brand-700); }
+
+  /* ─── CTA ───────────────────────────────────────────────── */
+  .cta {
+    background: linear-gradient(135deg, var(--brand-600) 0%, var(--brand-900) 100%);
+    color: white; border-radius: 14px;
+    padding: 22px 24px; margin-top: 16px;
+    page-break-inside: avoid;
+  }
+  .cta-title { font-size: 17pt; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 6px; }
+  .cta-sub { color: rgba(255,255,255,0.75); font-size: 10.5pt; line-height: 1.5; margin-bottom: 14px; }
+  .cta-info {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.15);
+  }
+  .cta-info-label {
+    font-size: 8pt; color: rgba(255,255,255,0.6);
+    letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px;
+  }
+  .cta-info-value { font-size: 10.5pt; font-weight: 600; color: white; }
+  .cta-info-value a { color: var(--gold-light); text-decoration: none; }
+
+  /* ─── Utilidad ──────────────────────────────────────────── */
+  .stack { display: flex; flex-direction: column; gap: 6px; }
+  .row-flex { display: flex; justify-content: space-between; align-items: baseline; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ PÁGINA 1 — PORTADA ════════════════ -->
+<section class="page cover">
+  <div class="cover-decoration"></div>
+  <div class="cover-hero">
+    <div class="cover-brand">
+      <div class="cover-logo"><img src="img/logazoramind.png" alt="Azoramind"></div>
+      <div>
+        <div class="cover-brand-name">Azoramind</div>
+      </div>
+    </div>
+    <div class="cover-eyebrow">Cotización comercial</div>
+    <div class="cover-title">Implementación<br>de Tareo</div>
+    <div class="cover-subtitle">
+      Control de actividades y horas hombre para constructoras,
+      industria y servicios — 100% digital, web + móvil.
+    </div>
+    <div class="cover-meta-grid">
+      <div>
+        <div class="cover-meta-label">Cotización N°</div>
+        <div class="cover-meta-value gold">COT-2026-0001</div>
+      </div>
+      <div>
+        <div class="cover-meta-label">Fecha de emisión</div>
+        <div class="cover-meta-value">26 de agosto, 2026</div>
+      </div>
+      <div>
+        <div class="cover-meta-label">Válida hasta</div>
+        <div class="cover-meta-value">25 de septiembre, 2026</div>
+      </div>
+      <div>
+        <div class="cover-meta-label">Moneda</div>
+        <div class="cover-meta-value">Soles peruanos (S/)</div>
+      </div>
+    </div>
+  </div>
+  <div class="cover-foot">
+    <div>
+      <div style="font-weight:600; color:white; margin-bottom:2px;">Azoramind</div>
+      <div>contacto@azoramind.com · azoramind.com</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="color:var(--gold-light); font-weight:700;">Preparada para</div>
+      <div style="font-size:9pt; margin-top:2px;">[Nombre del cliente]</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ PÁGINA 2 — RESUMEN + PLANES ════════════════ -->
+<section class="page">
+  <div class="doc-header">
+    <div class="doc-header-brand">
+      <div class="doc-header-logo"><img src="img/logazoramind.png" alt="Azoramind"></div>
+      <div class="doc-header-name">Azoramind Tareo</div>
+    </div>
+    <div class="doc-header-meta">
+      <div>Cotización <strong>COT-2026-0001</strong></div>
+      <div>Emitida el 26/08/2026 · Válida 30 días</div>
+    </div>
+  </div>
+
+  <div class="section-eyebrow">Resumen</div>
+  <h1 class="section-title">Planes de implementación</h1>
+  <div class="divider"></div>
+  <p class="lead">
+    La cotización incluye <strong>setup one-time</strong> (implementación + configuración +
+    capacitación) más <strong>suscripción mensual</strong> que cubre hosting, actualizaciones,
+    backups y soporte. Los precios están en soles peruanos, no incluyen IGV.
+  </p>
+
+  <div class="plans">
+    <!-- Starter -->
+    <div class="plan">
+      <div class="plan-name">Starter</div>
+      <div class="plan-size">Hasta 25 trabajadores</div>
+      <div class="plan-price">
+        <div class="plan-price-amount">S/ 320<span style="font-size:11pt; color:var(--slate-500); font-weight:600;">/mes</span></div>
+        <div class="plan-price-cadence">≈ S/ 13 por trabajador/mes</div>
+        <div class="plan-setup"><strong>+ S/ 950</strong> setup único</div>
+      </div>
+      <ul class="plan-features">
+        <li>Hasta 3 supervisores + 1 admin</li>
+        <li>1 proyecto activo</li>
+        <li>Web + app móvil Android</li>
+        <li>Dashboard con KPIs</li>
+        <li>Exportación Excel</li>
+        <li>Soporte por email (48 h)</li>
+        <li>Backups diarios</li>
+      </ul>
+    </div>
+
+    <!-- Business (featured) -->
+    <div class="plan featured">
+      <div class="plan-badge">Recomendado</div>
+      <div class="plan-name">Business</div>
+      <div class="plan-size">Hasta 80 trabajadores</div>
+      <div class="plan-price">
+        <div class="plan-price-amount">S/ 890<span style="font-size:11pt; color:var(--slate-500); font-weight:600;">/mes</span></div>
+        <div class="plan-price-cadence">≈ S/ 11 por trabajador/mes</div>
+        <div class="plan-setup"><strong>+ S/ 1.850</strong> setup único</div>
+      </div>
+      <ul class="plan-features">
+        <li>Hasta 8 supervisores + 2 admin</li>
+        <li>Hasta 5 proyectos simultáneos</li>
+        <li>Web + app móvil Android</li>
+        <li>Dashboard + agenda calendaria</li>
+        <li>Importador Excel de CECOs</li>
+        <li>Branding personalizado (logo, colores)</li>
+        <li>Soporte por email (24 h)</li>
+        <li>Capacitación online (2 sesiones)</li>
+      </ul>
+    </div>
+
+    <!-- Enterprise -->
+    <div class="plan">
+      <div class="plan-name">Enterprise</div>
+      <div class="plan-size">80+ trabajadores</div>
+      <div class="plan-price">
+        <div class="plan-price-amount">Desde<br><span style="font-size:24pt;">S/ 1.600</span><span style="font-size:11pt; color:var(--slate-500); font-weight:600;">/mes</span></div>
+        <div class="plan-price-cadence">≈ S/ 10 por trabajador/mes</div>
+        <div class="plan-setup"><strong>+ S/ 3.500</strong> setup único</div>
+      </div>
+      <ul class="plan-features">
+        <li>Usuarios y proyectos ilimitados</li>
+        <li>Web + app móvil Android + iOS</li>
+        <li>Dashboard + agenda + reportes custom</li>
+        <li>Subdominio propio (cliente.azoramind.com)</li>
+        <li>Onboarding presencial en obra (1 día)</li>
+        <li>Capacitación online (4 sesiones)</li>
+        <li>Soporte prioritario (12 h)</li>
+        <li>Integraciones a ERP a evaluar</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="terms-box">
+    <p><strong>Descuentos por pago anual:</strong> 15% de descuento sobre la mensualidad si el
+    contrato se paga por adelantado (12 meses). Ejemplo: plan Business anual = S/ 9.078
+    (ahorro de S/ 1.602).</p>
+    <p><strong>Sin permanencia forzada:</strong> mínimo 6 meses de contrato inicial. Después
+    del período, cancelación con 30 días de aviso.</p>
+  </div>
+
+  <div class="page-foot">Cotización · Azoramind Tareo</div>
+  <div class="page-num">02</div>
+</section>
+
+<!-- ════════════════ PÁGINA 3 — QUÉ INCLUYE ════════════════ -->
+<section class="page">
+  <div class="doc-header">
+    <div class="doc-header-brand">
+      <div class="doc-header-logo"><img src="img/logazoramind.png" alt="Azoramind"></div>
+      <div class="doc-header-name">Azoramind Tareo</div>
+    </div>
+    <div class="doc-header-meta">
+      <div>Cotización <strong>COT-2026-0001</strong></div>
+      <div>Emitida el 26/08/2026 · Válida 30 días</div>
+    </div>
+  </div>
+
+  <div class="section-eyebrow">Detalle</div>
+  <h1 class="section-title">¿Qué incluye la implementación?</h1>
+  <div class="divider"></div>
+
+  <h2 class="subsection-title">Setup one-time (pago único al firmar)</h2>
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="info-card-title gold">1. Instalación técnica</div>
+      <ul>
+        <li>Puesta en producción del sistema</li>
+        <li>Configuración de base de datos y hosting</li>
+        <li>Certificado SSL y backups automáticos</li>
+        <li>Verificación de disponibilidad 24/7</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title gold">2. Configuración de marca</div>
+      <ul>
+        <li>Logo, favicon y colores corporativos</li>
+        <li>Nombre y datos fiscales de la empresa</li>
+        <li>Personalización del correo de Excel</li>
+        <li>Etiqueta de ambiente (producción/staging)</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title gold">3. Carga inicial de datos</div>
+      <ul>
+        <li>Importación del catálogo de CECOs desde Excel</li>
+        <li>Alta de trabajadores (bulk desde plantilla)</li>
+        <li>Creación de usuarios con roles asignados</li>
+        <li>Configuración de proyectos activos</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title gold">4. Capacitación al equipo</div>
+      <ul>
+        <li>Sesión con administradores (1-2 horas)</li>
+        <li>Sesión con supervisores (1 hora)</li>
+        <li>Video-guía para trabajadores en la obra</li>
+        <li>Manual de usuario en PDF</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 class="subsection-title">Suscripción mensual (recurrente)</h2>
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="info-card-title">Infraestructura</div>
+      <ul>
+        <li>Hosting cloud en servidores de alta disponibilidad</li>
+        <li>Base de datos PostgreSQL con backups diarios</li>
+        <li>SSL/HTTPS y protección contra intrusiones</li>
+        <li>Monitoreo 24/7 del servicio</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title">Producto</div>
+      <ul>
+        <li>Panel web completo (dashboard, agenda, tareo, admin)</li>
+        <li>Aplicación móvil Android para el equipo de campo</li>
+        <li>Actualizaciones automáticas de nuevas versiones</li>
+        <li>Nuevas funcionalidades incluidas sin costo extra</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title">Soporte</div>
+      <ul>
+        <li>Consultas por email (contacto@azoramind.com)</li>
+        <li>Tiempo de respuesta según plan (12 h / 24 h / 48 h)</li>
+        <li>Reporte y corrección de bugs sin cargo</li>
+        <li>Asistencia con importaciones y cambios de catálogo</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title">Escalabilidad</div>
+      <ul>
+        <li>Sube o baja de plan cuando lo necesites</li>
+        <li>Sin límite en volumen de actividades registradas</li>
+        <li>Retención de datos históricos ilimitada</li>
+        <li>Exportación de datos disponible en cualquier momento</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-foot">Cotización · Azoramind Tareo</div>
+  <div class="page-num">03</div>
+</section>
+
+<!-- ════════════════ PÁGINA 4 — CRONOGRAMA + ADD-ONS + TOTAL ════════════════ -->
+<section class="page">
+  <div class="doc-header">
+    <div class="doc-header-brand">
+      <div class="doc-header-logo"><img src="img/logazoramind.png" alt="Azoramind"></div>
+      <div class="doc-header-name">Azoramind Tareo</div>
+    </div>
+    <div class="doc-header-meta">
+      <div>Cotización <strong>COT-2026-0001</strong></div>
+      <div>Emitida el 26/08/2026 · Válida 30 días</div>
+    </div>
+  </div>
+
+  <div class="section-eyebrow">Cronograma</div>
+  <h1 class="section-title">Implementación en 4 semanas</h1>
+  <div class="divider"></div>
+
+  <div class="timeline">
+    <div class="tl-step">
+      <div class="tl-num">1</div>
+      <div class="tl-week">Semana 1</div>
+      <div class="tl-title">Kick-off</div>
+      <div class="tl-desc">Levantamiento de necesidades. Instalación técnica. Configuración de marca.</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-num">2</div>
+      <div class="tl-week">Semana 2</div>
+      <div class="tl-title">Carga de datos</div>
+      <div class="tl-desc">Importación del catálogo CECO. Alta de trabajadores. Creación de proyectos y usuarios.</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-num">3</div>
+      <div class="tl-week">Semana 3</div>
+      <div class="tl-title">Capacitación</div>
+      <div class="tl-desc">Sesiones online con admin y supervisores. Instalación de APK en dispositivos.</div>
+    </div>
+    <div class="tl-step">
+      <div class="tl-num">4</div>
+      <div class="tl-week">Semana 4</div>
+      <div class="tl-title">Go-live</div>
+      <div class="tl-desc">Puesta en producción. Acompañamiento primeros 5 días hábiles.</div>
+    </div>
+  </div>
+
+  <h2 class="subsection-title">Servicios adicionales opcionales</h2>
+  <table class="total-tbl">
+    <thead>
+      <tr><th>Servicio</th><th style="text-align:right;">Precio (S/)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Aplicación móvil iOS (además de Android)</td>
+        <td class="num">+ 200 / mes</td>
+      </tr>
+      <tr>
+        <td>Capacitación presencial en obra (por día, viáticos aparte)</td>
+        <td class="num">800 / día</td>
+      </tr>
+      <tr>
+        <td>Reportes personalizados (a evaluar por complejidad)</td>
+        <td class="num">Desde 500</td>
+      </tr>
+      <tr>
+        <td>Integración a ERP contable (SAP / Concar / Contasol / otros)</td>
+        <td class="num">Cotización aparte</td>
+      </tr>
+      <tr>
+        <td>Migración de datos históricos desde otro sistema</td>
+        <td class="num">Cotización aparte</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="subsection-title">Ejemplo — Plan Business a 12 meses</h2>
+  <table class="total-tbl">
+    <thead>
+      <tr><th>Concepto</th><th style="text-align:right;">Monto (S/)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Setup único de implementación</td>
+        <td class="num">1.850,00</td>
+      </tr>
+      <tr>
+        <td>Suscripción mensual × 12 (S/ 890)</td>
+        <td class="num">10.680,00</td>
+      </tr>
+      <tr>
+        <td>Descuento por pago anual anticipado (−15%)</td>
+        <td class="num">−1.602,00</td>
+      </tr>
+      <tr class="total-row">
+        <td>Total año 1 (sin IGV)</td>
+        <td class="num">10.928,00</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="terms-box">
+    <p><strong>Formas de pago aceptadas:</strong> transferencia bancaria en soles a cuenta en
+    BCP / BBVA / Interbank a nombre de Azoramind. Emisión de recibo por honorarios o factura
+    electrónica según el cliente.</p>
+    <p><strong>Los precios no incluyen IGV.</strong> Al monto final se agrega el 18% de IGV
+    según normativa peruana vigente.</p>
+    <p><strong>Cronograma sujeto a disponibilidad del cliente</strong> para las sesiones de
+    capacitación y carga inicial de datos.</p>
+  </div>
+
+  <div class="page-foot">Cotización · Azoramind Tareo</div>
+  <div class="page-num">04</div>
+</section>
+
+<!-- ════════════════ PÁGINA 5 — CIERRE / CTA ════════════════ -->
+<section class="page">
+  <div class="doc-header">
+    <div class="doc-header-brand">
+      <div class="doc-header-logo"><img src="img/logazoramind.png" alt="Azoramind"></div>
+      <div class="doc-header-name">Azoramind Tareo</div>
+    </div>
+    <div class="doc-header-meta">
+      <div>Cotización <strong>COT-2026-0001</strong></div>
+      <div>Emitida el 26/08/2026 · Válida 30 días</div>
+    </div>
+  </div>
+
+  <div class="section-eyebrow">Aceptación</div>
+  <h1 class="section-title">Siguientes pasos</h1>
+  <div class="divider"></div>
+
+  <p class="lead">
+    Para avanzar con la implementación solo hace falta confirmar la elección del plan y firmar
+    el acuerdo. Nosotros nos encargamos de todo lo demás — desde el setup técnico hasta la
+    puesta en producción.
+  </p>
+
+  <div class="info-grid" style="margin-top: 12px;">
+    <div class="info-card">
+      <div class="info-card-title gold">1. Confirmación</div>
+      <ul>
+        <li>Responde por email con el plan elegido</li>
+        <li>Enviamos la orden de servicio para firma</li>
+        <li>Recibimos el pago del setup one-time</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title gold">2. Coordinación</div>
+      <ul>
+        <li>Reunión de kick-off dentro de 3 días hábiles</li>
+        <li>Definimos fechas de capacitación</li>
+        <li>Solicitamos el catálogo CECO en Excel</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title gold">3. Implementación</div>
+      <ul>
+        <li>Instalación y configuración (semanas 1-2)</li>
+        <li>Capacitación al equipo (semana 3)</li>
+        <li>Go-live y acompañamiento (semana 4)</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <div class="info-card-title gold">4. Producción</div>
+      <ul>
+        <li>Facturación mensual desde el mes 2</li>
+        <li>Soporte por email según SLA del plan</li>
+        <li>Reunión de seguimiento a los 3 meses</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="cta" style="margin-top: 22px;">
+    <div class="cta-title">¿Avanzamos?</div>
+    <div class="cta-sub">
+      Responde este correo con el plan elegido y coordinamos el kick-off la próxima semana.
+      Cualquier duda sobre la cotización, escríbenos.
+    </div>
+    <div class="cta-info">
+      <div>
+        <div class="cta-info-label">Empresa</div>
+        <div class="cta-info-value">Azoramind</div>
+      </div>
+      <div>
+        <div class="cta-info-label">Email</div>
+        <div class="cta-info-value"><a href="mailto:contacto@azoramind.com">contacto@azoramind.com</a></div>
+      </div>
+      <div>
+        <div class="cta-info-label">Web</div>
+        <div class="cta-info-value"><a href="https://azoramind.com">azoramind.com</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-foot">Cotización · Azoramind Tareo</div>
+  <div class="page-num">05</div>
+</section>
+
+</body>
+</html>
