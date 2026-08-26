@@ -140,18 +140,25 @@ export default function AdminTrabajadores() {
       sortable: true,
       render: (row) => {
         const n = row.proyectos_count || 0
+        // Diseño de "chip clickeable": borde punteado + underline en hover +
+        // ícono de lápiz al final → señal visual clara de acción, no decoración.
         const tone = n === 0
-          ? 'bg-slate-100 text-slate-500'
-          : 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+          ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-400'
+          : 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 hover:border-brand-400'
         return (
           <button
             type="button"
             onClick={() => setAssigningProyectos(row)}
-            title="Asignar proyectos"
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium tabular-nums transition-colors ${tone}`}
+            title={n === 0
+              ? 'Click para asignar proyectos a este trabajador'
+              : `Click para ver o editar los ${n === 1 ? 'proyecto asignado' : 'proyectos asignados'}`}
+            className={`group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tabular-nums border transition-colors ${tone}`}
           >
             <Icon.Folder className="w-3 h-3" />
-            {n === 0 ? 'Sin proyectos' : `${n} ${n === 1 ? 'proyecto' : 'proyectos'}`}
+            <span className="group-hover:underline">
+              {n === 0 ? 'Asignar proyectos' : `${n} ${n === 1 ? 'proyecto' : 'proyectos'}`}
+            </span>
+            <Icon.Edit className="w-3 h-3 opacity-60 group-hover:opacity-100" />
           </button>
         )
       },

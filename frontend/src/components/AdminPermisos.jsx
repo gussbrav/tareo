@@ -133,7 +133,7 @@ export default function AdminPermisos() {
     }
   }
 
-  if (loading) return <p className="text-slate-500 text-sm">Cargando matriz…</p>
+  if (loading) return <p className="text-slate-500 text-sm">Cargando permisos…</p>
 
   return (
     <div className="space-y-4">
@@ -162,7 +162,7 @@ export default function AdminPermisos() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase text-slate-500">
-                <th className="py-2 pr-3">Capacidad</th>
+                <th className="py-2 pr-3">Acción</th>
                 {ROLES.map((r) => (
                   <th key={r.key} className="py-2 px-2 text-center w-28">{r.label}</th>
                 ))}
@@ -200,13 +200,13 @@ export default function AdminPermisos() {
         </div>
       ))}
 
-      <div className="card bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-        <p><strong>Cómo funciona:</strong> el backend cachea la matriz por 60s. Un cambio aquí
-          invalida el cache al instante. Al siguiente request, el guard <code>require_permission()</code>
-          consulta la matriz actualizada.</p>
-        <p><strong>Encoding en UI:</strong> las páginas usan <code>/api/config/my-permissions</code> al login
-          para saber qué renderizar. Si desactivas una capability para un rol, ese usuario debe hacer
-          logout/login para que la UI se actualice.</p>
+      <div className="card bg-slate-50 border border-slate-200 text-xs text-slate-600">
+        <p>
+          <strong>Tip:</strong> si desactivas una acción para un rol, los usuarios de
+          ese rol que ya estén dentro del sistema deberán cerrar sesión y volver a entrar
+          para que el cambio se aplique en su pantalla. Los usuarios nuevos ya lo verán
+          desde el primer login.
+        </p>
       </div>
     </div>
   )
