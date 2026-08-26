@@ -17,7 +17,10 @@ from app.routers.actividades import router as actividades_router
 from app.routers.admin import router as admin_router
 from app.routers.catalogos import router as catalogos_router
 from app.routers.config import router as config_router
+from app.routers.correo import router as correo_router
 from app.routers.health import router as health_router
+from app.routers.invitaciones import admin_router as invitations_admin_router
+from app.routers.invitaciones import public_router as invitations_public_router
 from app.routers.reportes import router as reportes_router
 
 logging.basicConfig(
@@ -63,11 +66,14 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(invitations_public_router)
     app.include_router(catalogos_router)
     app.include_router(actividades_router)
     app.include_router(reportes_router)
     app.include_router(admin_router)
     app.include_router(config_router)
+    app.include_router(correo_router)
+    app.include_router(invitations_admin_router)
 
     # En prod servimos el bundle del frontend desde /static y catch-all a index.html
     static_dir = Path(__file__).resolve().parent.parent / "static"
