@@ -1,9 +1,15 @@
+/**
+ * TareoScreen — lista de actividades del día.
+ * Header con DateField premium (chevron + Hoy + date picker nativo).
+ * Sin FAB propio: el "+ Nueva" vive en el tab bar central para evitar
+ * duplicar dos botones azules en la misma pantalla.
+ */
 import { useCallback, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import {
   ActivityIndicator,
   FlatList,
-  Platform,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -14,8 +20,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { actividadesApi } from '../api/actividades'
 import { useAuthStore } from '../store/auth'
-import { colors } from '../theme'
-// Nota: el botón "Salir" ya no vive aquí — se movió al tab "Más".
+import { colors, radius, shadow, spacing, type } from '../theme'
+import DateField from '../ui/DateField'
+import Icon from '../ui/Icons'
 
 const today = () => {
   const d = new Date()
@@ -35,8 +42,8 @@ export default function TareoScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
-  const canCreate = user?.role === 'admin' || user?.role === 'supervisor'
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor'
+  const isToday = fecha === today()
 
   const load = useCallback(async () => {
     setError('')
@@ -64,7 +71,7 @@ export default function TareoScreen({ navigation }) {
   }
 
   const changeDay = (delta) => {
-    const d = new Date(fecha)
+    const d = new Date(fecha + 'T12:00:00')
     d.setDate(d.getDate() + delta)
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -75,39 +82,65 @@ export default function TareoScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.dateBar}>
-        <TouchableOpacity onPress={() => changeDay(-1)} style={styles.dateBtn}>
-          <Text style={styles.dateBtnText}>‹</Text>
-        </TouchableOpacity>
-        <View style={styles.dateBox}>
-          <Text style={styles.dateLabel}>Fecha</Text>
-          <Text style={styles.dateText}>{fecha}</Text>
+        <Pressable
+          onPress={() => changeDay(-1)}
+          style={styles.arrowBtn}
+          android_ripple={{ color: colors.surfaceSubtle, borderless: true }}
+          accessibilityLabel="Día anterior"
+        >
+          <Icon name="chevronLeft" size={20} color={colors.text.secondary} />
+        </Pressable>
+
+        <View style={styles.dateFieldWrap}>
+          <DateField value={fecha} onChange={setFecha} />
         </View>
-        <TouchableOpacity onPress={() => changeDay(1)} style={styles.dateBtn}>
-          <Text style={styles.dateBtnText}>›</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setFecha(today())} style={styles.todayBtn}>
-          <Text style={styles.todayText}>Hoy</Text>
-        </TouchableOpacity>
+
+        <Pressable
+          onPress={() => changeDay(1)}
+          style={styles.arrowBtn}
+          android_ripple={{ color: colors.surfaceSubtle, borderless: true }}
+          accessibilityLabel="Día siguiente"
+        >
+          <Icon name="chevronRight" size={20} color={colors.text.secondary} />
+        </Pressable>
+
+        <Pressable
+          onPress={() => setFecha(today())}
+          style={[styles.todayBtn, isToday && styles.todayBtnActive]}
+          android_ripple={{ color: colors.brand[500] }}
+          accessibilityLabel="Ir a hoy"
+        >
+          <Text style={[styles.todayText, isToday && styles.todayTextActive]}>Hoy</Text>
+        </Pressable>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {loading && items.length === 0 ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={colors.brand[600]} />
+        <ActivityIndicator style={{ marginTop: spacing['3xl'] }} color={colors.brand[600]} />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(it) => it.id}
-          contentContainerStyle={{ padding: 12, paddingBottom: 100 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} />}
+          contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing['4xl'] }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => { setRefreshing(true); load() }}
+              tintColor={colors.brand[600]}
+              colors={[colors.brand[600]]}
+            />
+          }
           renderItem={({ item }) => (
             <View style={styles.card}>
               <View style={styles.rowBetween}>
-                <Text style={styles.trabajador}>{item.trabajador_nombre}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={styles.trabajador} numberOfLines={1}>{item.trabajador_nombre}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                   <Text style={styles.date}>{item.fecdia_display}</Text>
                   {canEdit && (
-                    <TouchableOpacity onPress={() => navigation.navigate('EditarActividad', { actividadId: item.id })}>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('EditarActividad', { actividadId: item.id })}
+                    >
                       <Text style={styles.editLink}>Editar</Text>
                     </TouchableOpacity>
                   )}
@@ -116,7 +149,7 @@ export default function TareoScreen({ navigation }) {
               <Text style={styles.desc} numberOfLines={3}>{item.desactividad}</Text>
               <View style={styles.meta}>
                 <View style={[styles.badge, item.desestadoactividad === 'iniciado' ? styles.badgeAmber : styles.badgeEmerald]}>
-                  <Text style={[styles.badgeText, item.desestadoactividad === 'iniciado' ? { color: colors.amber[700] } : { color: colors.emerald[700] }]}>
+                  <Text style={[styles.badgeText, item.desestadoactividad === 'iniciado' ? { color: colors.warning[700] } : { color: colors.success[700] }]}>
                     {item.desestadoactividad}
                   </Text>
                 </View>
@@ -130,65 +163,78 @@ export default function TareoScreen({ navigation }) {
             </View>
           )}
           ListEmptyComponent={
-            <View style={{ padding: 40, alignItems: 'center' }}>
-              <Text style={{ color: colors.slate[500] }}>Sin actividades para esta fecha</Text>
+            <View style={styles.empty}>
+              <Text style={styles.emptyText}>Sin actividades para esta fecha</Text>
+              <Text style={styles.emptyHint}>Usa el botón + del centro para crear una nueva.</Text>
             </View>
           }
         />
-      )}
-
-      {canCreate && (
-        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('NuevaActividad')}>
-          <Text style={styles.fabText}>+</Text>
-        </TouchableOpacity>
       )}
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.slate[50] },
+  safe: { flex: 1, backgroundColor: colors.bg },
   dateBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: colors.slate[100], padding: 10, gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
   },
-  dateBtn: {
-    width: 40, height: 40, borderRadius: 10, backgroundColor: colors.slate[100],
+  arrowBtn: {
+    width: 40, height: 40, borderRadius: radius.pill,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.surfaceSubtle,
+  },
+  dateFieldWrap: { flex: 1 },
+  todayBtn: {
+    height: 40, paddingHorizontal: spacing.base,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSubtle,
     alignItems: 'center', justifyContent: 'center',
   },
-  dateBtnText: { fontSize: 24, color: colors.slate[700], fontWeight: '600', marginTop: -3 },
-  dateBox: { flex: 1, alignItems: 'center' },
-  dateLabel: { fontSize: 11, color: colors.slate[400], textTransform: 'uppercase' },
-  dateText: { fontSize: 16, color: colors.slate[900], fontWeight: '600' },
-  todayBtn: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.brand[600], borderRadius: 8 },
-  todayText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  todayBtnActive: { backgroundColor: colors.brand[600] },
+  todayText: { ...type.label, color: colors.text.secondary, fontWeight: '600' },
+  todayTextActive: { color: colors.text.inverse, fontWeight: '700' },
   error: {
-    marginHorizontal: 12, marginTop: 12, padding: 10, backgroundColor: colors.red[100],
-    color: colors.red[700], borderRadius: 8, fontSize: 13,
+    marginHorizontal: spacing.md, marginTop: spacing.md,
+    padding: spacing.md, borderRadius: radius.md,
+    backgroundColor: colors.danger[50], color: colors.danger[700],
+    ...type.body,
   },
   card: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.base,
+    marginBottom: spacing.md,
+    ...shadow.card,
   },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  trabajador: { fontSize: 15, fontWeight: '600', color: colors.slate[900], flex: 1 },
-  date: { fontSize: 12, color: colors.slate[400] },
-  editLink: { fontSize: 12, color: colors.brand[600], fontWeight: '600' },
-  desc: { fontSize: 14, color: colors.slate[700], marginTop: 6 },
-  meta: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 10, flexWrap: 'wrap' },
-  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
-  badgeAmber: { backgroundColor: colors.amber[100], borderColor: colors.amber[100] },
-  badgeEmerald: { backgroundColor: colors.emerald[100], borderColor: colors.emerald[100] },
-  badgeText: { fontSize: 11, fontWeight: '600', textTransform: 'lowercase' },
-  hora: { fontSize: 12, color: colors.slate[500] },
+  trabajador: { ...type.bodyStrong, color: colors.text.primary, flex: 1, marginRight: spacing.sm },
+  date: { ...type.caption, color: colors.text.muted },
+  editLink: { ...type.caption, color: colors.brand[600], fontWeight: '700' },
+  desc: { ...type.body, color: colors.text.secondary, marginTop: spacing.sm },
+  meta: {
+    flexDirection: 'row', alignItems: 'center',
+    marginTop: spacing.md, gap: spacing.md, flexWrap: 'wrap',
+  },
+  badge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.sm },
+  badgeAmber: { backgroundColor: colors.warning[100] },
+  badgeEmerald: { backgroundColor: colors.success[100] },
+  badgeText: { ...type.overline, letterSpacing: 0.4 },
+  hora: { ...type.caption, color: colors.text.tertiary },
   finalize: {
-    marginTop: 10, backgroundColor: colors.brand[600], borderRadius: 8, paddingVertical: 10, alignItems: 'center',
+    marginTop: spacing.md, backgroundColor: colors.brand[600],
+    borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center',
+    minHeight: 44, justifyContent: 'center',
   },
-  finalizeText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  fab: {
-    position: 'absolute', bottom: 24, right: 20, width: 58, height: 58, borderRadius: 29,
-    backgroundColor: colors.brand[600], alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 6,
-  },
-  fabText: { color: '#fff', fontSize: 32, fontWeight: '300', marginTop: Platform.OS === 'android' ? -4 : 0 },
+  finalizeText: { ...type.bodyStrong, color: colors.text.inverse },
+  empty: { padding: spacing['3xl'], alignItems: 'center' },
+  emptyText: { ...type.body, color: colors.text.tertiary },
+  emptyHint: { ...type.caption, color: colors.text.muted, marginTop: spacing.xs, textAlign: 'center' },
 })

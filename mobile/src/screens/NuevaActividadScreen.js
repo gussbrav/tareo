@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { actividadesApi, catalogosApi } from '../api/actividades'
 import { colors } from '../theme'
+import DateField from '../ui/DateField'
 
 const today = () => {
   const d = new Date()
@@ -142,13 +143,7 @@ export default function NuevaActividadScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 80 }}>
-        <Text style={styles.label}>Fecha</Text>
-        <TextInput
-          style={styles.input}
-          value={fecha}
-          onChangeText={setFecha}
-          placeholder="YYYY-MM-DD"
-        />
+        <DateField label="Fecha" value={fecha} onChange={setFecha} />
 
         <Text style={styles.label}>Contrato / Proyecto</Text>
         <Picker items={proyectos} valueKey="id" labelKey="descontratoproyecto"

@@ -13,7 +13,8 @@ import NuevaActividadScreen from './src/screens/NuevaActividadScreen'
 import ReportesScreen from './src/screens/ReportesScreen'
 import TareoScreen from './src/screens/TareoScreen'
 import { hydrate, useAuthStore } from './src/store/auth'
-import { colors, motion, radius, shadow, spacing, type } from './src/theme'
+import { colors, radius, shadow, spacing, type } from './src/theme'
+import Icon from './src/ui/Icons'
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -49,33 +50,30 @@ function TareoStackNav() {
   )
 }
 
-// ─── Icono para tab bar (glifos simples, sin lib externa) ─────────────────
-const ICONS = {
-  Home: '⌂',
-  TareoStack: '≡',
-  Nueva: '＋',
-  Reportes: '⊞',
-  Mas: '⋯',
+// ─── Icono para tab bar (SVG outline, family Lucide-style) ────────────────
+const ICON_NAME = {
+  Home: 'home',
+  TareoStack: 'clipboardCheck',
+  Reportes: 'barChart',
+  Mas: 'dotsHorizontal',
 }
 
 function TabIcon({ name, focused, isFab }) {
   if (isFab) {
     return (
       <View style={styles.fab} accessible accessibilityLabel="Nueva actividad">
-        <Text style={styles.fabIcon}>{ICONS[name]}</Text>
+        <Icon name="plus" size={26} color={colors.text.inverse} strokeWidth={2.25} />
       </View>
     )
   }
   return (
     <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-      <Text
-        style={[
-          styles.iconGlyph,
-          { color: focused ? colors.brand[600] : colors.text.muted },
-        ]}
-      >
-        {ICONS[name]}
-      </Text>
+      <Icon
+        name={ICON_NAME[name]}
+        size={22}
+        color={focused ? colors.brand[600] : colors.text.muted}
+        strokeWidth={focused ? 2 : 1.75}
+      />
     </View>
   )
 }
@@ -120,8 +118,14 @@ function MainTabs() {
           name="Nueva"
           component={NuevaActividadScreen}
           options={{
-            title: '',
-            tabBarLabel: () => null,
+            title: 'Nueva',
+            // Header visible dentro del tab para dar contexto — sin el
+            // usuario aterriza en el formulario sin saber dónde está.
+            headerShown: true,
+            headerTitle: 'Nueva actividad',
+            headerTitleStyle: { fontWeight: '700', color: colors.text.primary },
+            headerStyle: { backgroundColor: colors.surface },
+            headerShadowVisible: false,
             tabBarIcon: ({ focused }) => <TabIcon name="Nueva" focused={focused} isFab />,
           }}
         />
