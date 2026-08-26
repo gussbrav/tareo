@@ -77,6 +77,7 @@ export const Icon = {
   ArrowDown: wrap(<path d="M12 5v14M19 12l-7 7-7-7" />),
   ChevronLeft: wrap(<path d="M15 18l-6-6 6-6" />),
   ChevronRight: wrap(<path d="M9 6l6 6-6 6" />),
+  ChevronDown: wrap(<path d="M6 9l6 6 6-6" />),
   Info: wrap(<>
     <circle cx="12" cy="12" r="9" />
     <path d="M12 8h.01M11 12h1v4h1" />

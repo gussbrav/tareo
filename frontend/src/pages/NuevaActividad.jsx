@@ -5,6 +5,7 @@ import { actividadesApi } from '../api/actividades'
 import { catalogosApi } from '../api/catalogos'
 import DateField from '../components/admin/DateField.jsx'
 import { Icon } from '../components/admin/Icons.jsx'
+import SearchableSelect from '../components/admin/SearchableSelect.jsx'
 import { today } from '../lib/format'
 
 function initials(name) {
@@ -25,7 +26,9 @@ export default function NuevaActividad() {
   const [areas, setAreas] = useState([])
   const [loadingAreas, setLoadingAreas] = useState(false)
   const [especialidades, setEspecialidades] = useState([])
+  const [loadingEspecialidades, setLoadingEspecialidades] = useState(false)
   const [centrosCosto, setCentrosCosto] = useState([])
+  const [loadingCC, setLoadingCC] = useState(false)
   const [trabajadores, setTrabajadores] = useState([])
   const [searchWorker, setSearchWorker] = useState('')
 
@@ -78,18 +81,26 @@ export default function NuevaActividad() {
     setEspecialidadId('')
     setCentrosCosto([])
     setCentroCostoId('')
-    if (areaId) catalogosApi.especialidades(areaId).then(setEspecialidades)
+    if (areaId) {
+      setLoadingEspecialidades(true)
+      catalogosApi.especialidades(areaId)
+        .then(setEspecialidades)
+        .finally(() => setLoadingEspecialidades(false))
+    }
   }, [areaId])
 
   useEffect(() => {
     setCentrosCosto([])
     setCentroCostoId('')
     if (especialidadId) {
-      catalogosApi.centrosCosto(especialidadId).then((data) => {
-        setCentrosCosto(data)
-        const manoDeObra = data.find((c) => (c.nbrcentrocosto || '').toLowerCase().includes('mano de obra'))
-        if (manoDeObra) setCentroCostoId(manoDeObra.id)
-      })
+      setLoadingCC(true)
+      catalogosApi.centrosCosto(especialidadId)
+        .then((data) => {
+          setCentrosCosto(data)
+          const manoDeObra = data.find((c) => (c.nbrcentrocosto || '').toLowerCase().includes('mano de obra'))
+          if (manoDeObra) setCentroCostoId(manoDeObra.id)
+        })
+        .finally(() => setLoadingCC(false))
     }
   }, [especialidadId])
 
@@ -194,20 +205,21 @@ export default function NuevaActividad() {
             </div>
             <div>
               <label className="label">Contrato / Proyecto <Req /></label>
-              <select className="input" value={proyectoId} onChange={(e) => setProyectoId(e.target.value)} required>
-                <option value="">Selecciona…</option>
-                {proyectos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.descontratoproyecto || p.nbrproyecto}
-                  </option>
-                ))}
-              </select>
+              <SearchableSelect
+                value={proyectoId}
+                onChange={setProyectoId}
+                options={proyectos}
+                getLabel={(p) => p.descontratoproyecto || p.nbrproyecto}
+                placeholder="Selecciona…"
+                emptyText="No hay proyectos activos"
+                required
+              />
             </div>
             <div>
               <label className="label inline-flex items-center gap-1.5">
                 Área <Req />
-                {/* Tooltip solo cuando ya cargó y no hay áreas — evita el flash
-                    intermitente del banner naranja mientras la API responde. */}
+                {/* Tooltip solo cuando la API confirmó que no hay áreas —
+                    permite guiar al admin hacia Configuración. */}
                 {proyectoId && !loadingAreas && areas.length === 0 && (
                   <InfoTooltip>
                     Carga las áreas de este proyecto desde <strong>Configuración → Áreas</strong>
@@ -215,62 +227,45 @@ export default function NuevaActividad() {
                   </InfoTooltip>
                 )}
               </label>
-              <select
-                className="input"
+              <SearchableSelect
                 value={areaId}
-                onChange={(e) => setAreaId(e.target.value)}
-                required
+                onChange={setAreaId}
+                options={areas}
+                placeholder="Selecciona…"
                 disabled={!proyectoId || loadingAreas || areas.length === 0}
-              >
-                <option value="">
-                  {!proyectoId
-                    ? 'Elige un proyecto primero'
-                    : loadingAreas
-                      ? 'Cargando áreas…'
-                      : areas.length === 0
-                        ? 'Este proyecto no tiene áreas'
-                        : 'Selecciona…'}
-                </option>
-                {areas.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.display_name}
-                  </option>
-                ))}
-              </select>
+                disabledText={!proyectoId ? 'Elige un proyecto primero' : undefined}
+                loading={loadingAreas}
+                emptyText="Este proyecto no tiene áreas"
+                required
+              />
             </div>
             <div>
               <label className="label">Especialidad <Req /></label>
-              <select
-                className="input"
+              <SearchableSelect
                 value={especialidadId}
-                onChange={(e) => setEspecialidadId(e.target.value)}
+                onChange={setEspecialidadId}
+                options={especialidades}
+                placeholder="Selecciona…"
+                disabled={!areaId || loadingEspecialidades || especialidades.length === 0}
+                disabledText={!areaId ? 'Elige un área primero' : undefined}
+                loading={loadingEspecialidades}
+                emptyText="Esta área no tiene especialidades"
                 required
-                disabled={!areaId}
-              >
-                <option value="">{areaId ? 'Selecciona…' : 'Elige un área primero'}</option>
-                {especialidades.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.display_name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
             <div className="sm:col-span-2">
               <label className="label">Centro de costo <Req /></label>
-              <select
-                className="input"
+              <SearchableSelect
                 value={centroCostoId}
-                onChange={(e) => setCentroCostoId(e.target.value)}
+                onChange={setCentroCostoId}
+                options={centrosCosto}
+                placeholder="Selecciona…"
+                disabled={!especialidadId || loadingCC || centrosCosto.length === 0}
+                disabledText={!especialidadId ? 'Elige una especialidad primero' : undefined}
+                loading={loadingCC}
+                emptyText="Esta especialidad no tiene centros de costo"
                 required
-                disabled={!especialidadId}
-              >
-                <option value="">{especialidadId ? 'Selecciona…' : 'Elige una especialidad primero'}</option>
-                {centrosCosto.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.display_name}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
         </div>
