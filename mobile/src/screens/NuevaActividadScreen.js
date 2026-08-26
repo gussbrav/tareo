@@ -120,7 +120,15 @@ export default function NuevaActividadScreen({ navigation }) {
         trabajador_ids: selectedTrabajadores,
       })
       Alert.alert('OK', `Se crearon ${res.created} actividad(es)`, [
-        { text: 'Volver', onPress: () => navigation.goBack() },
+        {
+          text: 'Volver',
+          onPress: () => {
+            // Si se abrió desde el tab bar (sin stack padre) navegamos a Tareo;
+            // si vino de un stack (ej. desde el FAB de TareoScreen) hacemos back.
+            if (navigation.canGoBack()) navigation.goBack()
+            else navigation.navigate('TareoStack', { screen: 'Tareo' })
+          },
+        },
       ])
     } catch (e) {
       Alert.alert('Error', e.response?.data?.detail || 'No se pudo crear')

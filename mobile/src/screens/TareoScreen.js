@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { actividadesApi } from '../api/actividades'
 import { useAuthStore } from '../store/auth'
 import { colors } from '../theme'
+// Nota: el botón "Salir" ya no vive aquí — se movió al tab "Más".
 
 const today = () => {
   const d = new Date()
@@ -27,7 +28,7 @@ const today = () => {
 const fmtHM = (t) => (t ? String(t).slice(0, 5) : '--:--')
 
 export default function TareoScreen({ navigation }) {
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore()
   const [fecha, setFecha] = useState(today())
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
@@ -141,10 +142,6 @@ export default function TareoScreen({ navigation }) {
           <Text style={styles.fabText}>+</Text>
         </TouchableOpacity>
       )}
-
-      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-        <Text style={styles.logoutText}>Salir</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   )
 }
@@ -194,6 +191,4 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 6,
   },
   fabText: { color: '#fff', fontSize: 32, fontWeight: '300', marginTop: Platform.OS === 'android' ? -4 : 0 },
-  logoutBtn: { position: 'absolute', bottom: 24, left: 20, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.slate[200] },
-  logoutText: { color: colors.slate[700], fontSize: 13, fontWeight: '600' },
 })
