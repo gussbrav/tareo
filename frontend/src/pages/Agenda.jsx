@@ -244,16 +244,22 @@ function MonthView({ year, month, itemsByDay, selectedDay, setSelectedDay, today
                   {cell.day}
                 </span>
               </div>
-              <div className="space-y-[2px] flex-1 min-h-0 overflow-hidden">
-                {shown.map((it) => (
-                  <MonthPill key={it.id} item={it} groupBy={groupBy} onOpen={onOpen} />
-                ))}
+              <div className="flex flex-col gap-[2px] flex-1 min-h-0">
+                {/* Stack de pills — se recorta si la celda es baja */}
+                <div className="flex flex-col gap-[2px] flex-1 min-h-0 overflow-hidden">
+                  {shown.map((it) => (
+                    <MonthPill key={it.id} item={it} groupBy={groupBy} onOpen={onOpen} />
+                  ))}
+                </div>
+                {/* Badge "+N" — shrink-0 para que SIEMPRE sea visible aún
+                    con zoom 100% o viewports chicos */}
                 {extras > 0 && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onOpenDay(cell.iso) }}
-                    className="inline-block text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100
-                               px-1.5 py-0 rounded tabular-nums leading-[14px] transition-colors"
+                    className="shrink-0 self-start text-[10px] font-semibold text-brand-700
+                               bg-brand-50 hover:bg-brand-100 px-1.5 py-0 rounded
+                               tabular-nums leading-[14px] transition-colors"
                     title={`Ver ${extras} más`}
                   >
                     +{extras}
