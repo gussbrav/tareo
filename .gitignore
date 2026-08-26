@@ -55,3 +55,9 @@ mobile/android/local.properties
 tmp/
 _tmp/
 _*.txt
+
+# Docs — PDF autogenerado desde HTML, la fuente commiteada es el .html
+docs/*.pdf
+docs/img/*.png
+docs/img/*.jpg
+docs/img/*.jpeg

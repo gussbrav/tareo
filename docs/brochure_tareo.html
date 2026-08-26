@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Azoramind Tareo — Brochure Comercial</title>
+<style>
+  /* ─── Print setup ─────────────────────────────────────────────── */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    color: #0F172A;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  /* ─── Paleta Azoramind ───────────────────────────────────────── */
+  :root {
+    --brand-50: #EFF4FF;
+    --brand-100: #DBE7FE;
+    --brand-500: #3B65F5;
+    --brand-600: #1E40AF;
+    --brand-700: #1E3A8A;
+    --brand-900: #1B2A5C;
+    --gold: #D9A518;
+    --gold-light: #F5C542;
+    --slate-50: #F8FAFC;
+    --slate-100: #F1F5F9;
+    --slate-200: #E2E8F0;
+    --slate-400: #94A3B8;
+    --slate-500: #64748B;
+    --slate-700: #334155;
+    --slate-900: #0F172A;
+    --emerald: #059669;
+    --emerald-50: #ECFDF5;
+  }
+
+  /* ─── Page primitives ─────────────────────────────────────────── */
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding: 20mm 18mm;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+    background: white;
+  }
+  .page:last-child { page-break-after: auto; }
+  .page-num {
+    position: absolute;
+    bottom: 12mm;
+    right: 18mm;
+    font-size: 9pt;
+    color: var(--slate-400);
+    letter-spacing: 0.05em;
+  }
+  .page-foot {
+    position: absolute;
+    bottom: 12mm;
+    left: 18mm;
+    font-size: 9pt;
+    color: var(--slate-400);
+  }
+
+  /* ─── Portada ────────────────────────────────────────────────── */
+  .cover {
+    background: linear-gradient(135deg, #1E40AF 0%, #1B2A5C 100%);
+    color: white;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .cover-hero {
+    padding: 40mm 20mm 0 20mm;
+    position: relative;
+  }
+  .cover-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 60mm;
+  }
+  .cover-logo {
+    width: 44px;
+    height: 44px;
+    background: var(--gold);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    color: var(--brand-900);
+    font-size: 22px;
+  }
+  .cover-brand-name { font-size: 14pt; font-weight: 600; letter-spacing: 0.02em; }
+  .cover-brand-tag { font-size: 9pt; color: rgba(255,255,255,0.6); margin-top: 2px; }
+  .cover-title {
+    font-size: 54pt;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+  .cover-subtitle {
+    font-size: 15pt;
+    font-weight: 400;
+    line-height: 1.4;
+    color: rgba(255,255,255,0.75);
+    max-width: 140mm;
+    margin-bottom: 8px;
+  }
+  .cover-chip {
+    display: inline-block;
+    margin-top: 24px;
+    padding: 6px 14px;
+    background: rgba(217,165,24,0.15);
+    border: 1px solid rgba(217,165,24,0.4);
+    color: var(--gold-light);
+    border-radius: 999px;
+    font-size: 10pt;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .cover-decoration {
+    position: absolute;
+    right: -50mm;
+    top: 40mm;
+    width: 200mm;
+    height: 200mm;
+    background: radial-gradient(circle, rgba(217,165,24,0.15) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .cover-foot {
+    padding: 20mm;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    color: rgba(255,255,255,0.7);
+    font-size: 10pt;
+    border-top: 1px solid rgba(255,255,255,0.15);
+  }
+  .cover-year { font-weight: 700; color: var(--gold-light); }
+
+  /* ─── Section headers ────────────────────────────────────────── */
+  .section-eyebrow {
+    font-size: 9pt;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h1.section-title {
+    font-size: 32pt;
+    font-weight: 800;
+    color: var(--slate-900);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+  h2.section-title {
+    font-size: 24pt;
+    font-weight: 700;
+    color: var(--slate-900);
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    margin-bottom: 12px;
+  }
+  .section-lead {
+    font-size: 12pt;
+    line-height: 1.55;
+    color: var(--slate-500);
+    max-width: 145mm;
+    margin-bottom: 20px;
+  }
+  .divider {
+    height: 3px;
+    width: 48px;
+    background: var(--gold);
+    margin: 20px 0 24px 0;
+  }
+
+  /* ─── Body text ──────────────────────────────────────────────── */
+  p { font-size: 11pt; line-height: 1.6; color: var(--slate-700); margin-bottom: 10px; }
+  strong { color: var(--slate-900); font-weight: 700; }
+  ul { list-style: none; }
+  li {
+    font-size: 11pt;
+    line-height: 1.5;
+    color: var(--slate-700);
+    padding-left: 22px;
+    position: relative;
+    margin-bottom: 6px;
+  }
+  li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 6px;
+    height: 6px;
+    background: var(--brand-600);
+    border-radius: 999px;
+  }
+
+  /* ─── Cards ──────────────────────────────────────────────────── */
+  .benefit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin-top: 8px;
+  }
+  .benefit {
+    background: var(--slate-50);
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    padding: 16px 16px 14px 16px;
+    page-break-inside: avoid;
+  }
+  .benefit-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: var(--brand-50);
+    color: var(--brand-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    font-size: 18px;
+    font-weight: 700;
+  }
+  .benefit-icon.gold { background: rgba(217,165,24,0.12); color: var(--gold); }
+  .benefit-icon.emerald { background: var(--emerald-50); color: var(--emerald); }
+  .benefit-title {
+    font-size: 12pt;
+    font-weight: 700;
+    color: var(--slate-900);
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+  .benefit-desc { font-size: 10pt; color: var(--slate-500); line-height: 1.45; }
+
+  /* ─── Screenshot placeholder + real img ─────────────────────── */
+  .screenshot {
+    border: 2px dashed var(--brand-500);
+    background: linear-gradient(180deg, var(--brand-50) 0%, white 100%);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 14px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    page-break-inside: avoid;
+    position: relative;
+  }
+  /* Cuando el placeholder se reemplaza por <img class="screenshot-img">,
+     el estilo cambia: sin dashed, sin padding, la imagen se muestra full-width. */
+  .screenshot.has-image {
+    border: 1px solid var(--slate-200);
+    background: white;
+    padding: 0;
+    overflow: hidden;
+  }
+  .screenshot-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+  }
+  .screenshot-small { min-height: 60mm; }
+  .screenshot-medium { min-height: 90mm; }
+  .screenshot-large { min-height: 120mm; }
+  .screenshot-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    background: var(--brand-100);
+    color: var(--brand-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .screenshot-title {
+    font-size: 11pt;
+    font-weight: 700;
+    color: var(--brand-700);
+    margin-bottom: 4px;
+  }
+  .screenshot-hint {
+    font-size: 9pt;
+    color: var(--slate-500);
+    max-width: 100mm;
+    line-height: 1.4;
+  }
+  .screenshot-corner {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 8pt;
+    font-weight: 700;
+    color: var(--brand-600);
+    background: rgba(255,255,255,0.9);
+    padding: 3px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ─── Roles ──────────────────────────────────────────────────── */
+  .roles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 8px;
+  }
+  .role {
+    border: 1px solid var(--slate-200);
+    border-radius: 10px;
+    padding: 14px 12px;
+    page-break-inside: avoid;
+  }
+  .role-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 9pt;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+  .role-badge.admin { background: #FEE2E2; color: #991B1B; }
+  .role-badge.supervisor { background: var(--brand-50); color: var(--brand-700); }
+  .role-badge.trabajador { background: var(--slate-100); color: var(--slate-700); }
+  .role-title { font-size: 12pt; font-weight: 700; color: var(--slate-900); margin-bottom: 4px; }
+  .role-desc { font-size: 9.5pt; color: var(--slate-500); line-height: 1.45; }
+
+  /* ─── Feature row ────────────────────────────────────────────── */
+  .feature-row {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 20px;
+    margin: 16px 0;
+    page-break-inside: avoid;
+  }
+  .feature-row.reverse { grid-template-columns: 1.2fr 1fr; }
+  .feature-text .step-num {
+    display: inline-block;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: var(--gold);
+    color: white;
+    text-align: center;
+    line-height: 26px;
+    font-weight: 800;
+    font-size: 12pt;
+    margin-bottom: 10px;
+  }
+  .feature-text h3 {
+    font-size: 15pt;
+    font-weight: 700;
+    color: var(--slate-900);
+    margin-bottom: 8px;
+    line-height: 1.2;
+  }
+  .feature-text p { font-size: 10.5pt; line-height: 1.55; margin-bottom: 6px; }
+  .feature-text .highlights {
+    margin-top: 8px;
+  }
+  .feature-text .highlights li {
+    font-size: 10pt;
+    padding-left: 18px;
+    margin-bottom: 4px;
+  }
+  .feature-text .highlights li::before {
+    background: var(--emerald);
+    top: 7px;
+    width: 5px;
+    height: 5px;
+  }
+
+  /* ─── Contacto/CTA ───────────────────────────────────────────── */
+  .cta {
+    background: linear-gradient(135deg, var(--brand-600) 0%, var(--brand-900) 100%);
+    color: white;
+    border-radius: 14px;
+    padding: 28px 26px;
+    margin-top: 20px;
+    page-break-inside: avoid;
+  }
+  .cta-title {
+    font-size: 20pt;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+  .cta-sub { color: rgba(255,255,255,0.75); font-size: 11pt; line-height: 1.5; margin-bottom: 16px; }
+  .cta-info {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+  }
+  .cta-info-label { font-size: 8pt; color: rgba(255,255,255,0.6); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .cta-info-value { font-size: 11pt; font-weight: 600; color: white; }
+  .cta-info-value a { color: var(--gold-light); text-decoration: none; }
+
+  /* ─── Small utility ──────────────────────────────────────────── */
+  .stat-row {
+    display: flex;
+    gap: 24px;
+    margin: 20px 0;
+    padding: 18px 20px;
+    background: var(--slate-50);
+    border-left: 4px solid var(--gold);
+    border-radius: 6px;
+  }
+  .stat { text-align: center; flex: 1; }
+  .stat-num { font-size: 26pt; font-weight: 800; color: var(--brand-600); line-height: 1; letter-spacing: -0.02em; }
+  .stat-label { font-size: 9pt; color: var(--slate-500); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ PÁGINA 1 — PORTADA ═══════════════════ -->
+<section class="page cover">
+  <div class="cover-decoration"></div>
+  <div class="cover-hero">
+    <div class="cover-brand">
+      <div class="cover-logo">A</div>
+      <div>
+        <div class="cover-brand-name">Azoramind</div>
+      </div>
+    </div>
+    <div class="cover-title">Tareo</div>
+    <div class="cover-subtitle">
+      Control de actividades y horas hombre — para constructoras, industria y servicios.
+    </div>
+    <div class="cover-chip">Brochure comercial · Producto vendible</div>
+  </div>
+  <div class="cover-foot">
+    <div>
+      <div style="font-weight:600; color:white; margin-bottom:2px;">azoramind.com</div>
+      <div>contacto@azoramind.com</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="cover-year">v0.1.0 · 2026</div>
+      <div style="font-size:9pt; margin-top:2px;">Hecho en Perú</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ PÁGINA 2 — QUÉ ES TAREO ═══════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">¿Qué es Tareo?</div>
+  <h1 class="section-title">Sabe qué hace tu equipo,<br>en tiempo real.</h1>
+  <div class="divider"></div>
+  <p class="section-lead">
+    Tareo es una app web y móvil que <strong>digitaliza el registro diario de actividades</strong>
+    de tu equipo operativo. Reemplaza las planillas de papel, los Excels dispersos y los reportes
+    a fin de mes con un flujo simple: cada trabajador registra qué hace, tú lo ves al toque.
+  </p>
+
+  <div class="screenshot screenshot-large">
+    <!-- Para usar captura real: guarda tu png/jpg en img/captura-01.png,
+         cambia arriba class="screenshot screenshot-large" por class="screenshot has-image",
+         y descomenta la línea de abajo, borra el bloque placeholder -->
+    <!-- <img src="img/captura-01.png" alt="Dashboard Analytics" class="screenshot-img"> -->
+    <div class="screenshot-corner">CAPTURA 01</div>
+    <div class="screenshot-icon">📊</div>
+    <div class="screenshot-title">Dashboard Analytics</div>
+    <div class="screenshot-hint">
+      Captura de la vista de Dashboard mostrando los 6 KPIs superiores<br>
+      (Horas totales, Finalizadas, En proceso, Trabajadores activos, Tasa finalización, Prom hs/día)<br>
+      y el gráfico de tendencia diaria debajo.
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-num">2</div>
+      <div class="stat-label">Minutos por registro</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">100%</div>
+      <div class="stat-label">Digital · cero papel</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">3</div>
+      <div class="stat-label">Roles diferenciados</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">24/7</div>
+      <div class="stat-label">Web · Android · iOS</div>
+    </div>
+  </div>
+
+  <div class="page-foot">Azoramind Tareo · Brochure</div>
+  <div class="page-num">02</div>
+</section>
+
+<!-- ═══════════════════ PÁGINA 3 — BENEFICIOS ═══════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">Por qué Tareo</div>
+  <h2 class="section-title">Todo lo que perdías con planillas,<br>lo ganas de vuelta.</h2>
+  <div class="divider"></div>
+
+  <div class="benefit-grid">
+    <div class="benefit">
+      <div class="benefit-icon">⏱</div>
+      <div class="benefit-title">Registro al toque</div>
+      <div class="benefit-desc">
+        El trabajador abre la app, elige su tarea, y arranca. La hora se registra automáticamente.
+      </div>
+    </div>
+    <div class="benefit">
+      <div class="benefit-icon emerald">✓</div>
+      <div class="benefit-title">Finalizar en 1 clic</div>
+      <div class="benefit-desc">
+        Al terminar, un botón grande. Nada de firmar planillas ni recordar horas exactas.
+      </div>
+    </div>
+    <div class="benefit">
+      <div class="benefit-icon gold">📅</div>
+      <div class="benefit-title">Agenda calendaria</div>
+      <div class="benefit-desc">
+        Vista mensual, semanal y lista. Sabes qué se hizo cada día, quién y cuánto tiempo.
+      </div>
+    </div>
+    <div class="benefit">
+      <div class="benefit-icon">📊</div>
+      <div class="benefit-title">Dashboard en vivo</div>
+      <div class="benefit-desc">
+        KPIs, tendencias, ranking por trabajador y análisis por centro de costo — sin exportar nada.
+      </div>
+    </div>
+    <div class="benefit">
+      <div class="benefit-icon gold">📥</div>
+      <div class="benefit-title">Excel a un clic</div>
+      <div class="benefit-desc">
+        Reporte formateado listo para contabilidad. Se descarga con un botón, sin macros ni magia.
+      </div>
+    </div>
+    <div class="benefit">
+      <div class="benefit-icon emerald">🔒</div>
+      <div class="benefit-title">Roles y permisos</div>
+      <div class="benefit-desc">
+        Admin, supervisor, trabajador. Cada uno ve y hace solo lo que le corresponde.
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 24px;">
+    <h3 style="font-size:14pt; font-weight:700; color:var(--slate-900); margin-bottom:10px;">
+      Diseñado para 3 roles claros
+    </h3>
+    <div class="roles">
+      <div class="role">
+        <span class="role-badge admin">Admin</span>
+        <div class="role-title">Dueño / IT</div>
+        <div class="role-desc">
+          Configura todo: marca, usuarios, catálogos, permisos. Acceso total a reportes y edición.
+        </div>
+      </div>
+      <div class="role">
+        <span class="role-badge supervisor">Supervisor</span>
+        <div class="role-title">Jefe de obra / Encargado</div>
+        <div class="role-desc">
+          Crea actividades, asigna trabajadores, ve el tareo de todos, exporta Excel.
+        </div>
+      </div>
+      <div class="role">
+        <span class="role-badge trabajador">Trabajador</span>
+        <div class="role-title">Operario / Ayudante</div>
+        <div class="role-desc">
+          Ve solo sus tareas del día. Un botón para finalizar. Simplicidad total.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-foot">Azoramind Tareo · Brochure</div>
+  <div class="page-num">03</div>
+</section>
+
+<!-- ═══════════════════ PÁGINA 4 — TOUR: TAREO + NUEVA ═══════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">Tour del producto · 1/2</div>
+  <h2 class="section-title">Simple para el trabajador,<br>completo para el supervisor.</h2>
+  <div class="divider"></div>
+
+  <div class="feature-row">
+    <div class="feature-text">
+      <div class="step-num">1</div>
+      <h3>Registrar una nueva actividad</h3>
+      <p>El supervisor abre "Nueva actividad", elige día, proyecto, área, especialidad y centro de costo. Después describe el trabajo y marca a los trabajadores asignados.</p>
+      <ul class="highlights">
+        <li>Cascada inteligente: al elegir proyecto, solo aparecen las áreas de ese proyecto</li>
+        <li>Búsqueda dentro del listado de trabajadores</li>
+        <li>Chip contador de "N seleccionados" siempre visible</li>
+        <li>Botón sticky de "Crear actividad" al fondo</li>
+      </ul>
+    </div>
+    <div class="screenshot screenshot-medium">
+      <!-- <img src="img/captura-02.png" alt="Nueva actividad" class="screenshot-img"> -->
+      <div class="screenshot-corner">CAPTURA 02</div>
+      <div class="screenshot-icon">＋</div>
+      <div class="screenshot-title">Nueva actividad</div>
+      <div class="screenshot-hint">
+        Captura del formulario<br>
+        con las 2 secciones<br>
+        (Selección + Registro) y el<br>
+        listado de trabajadores.
+      </div>
+    </div>
+  </div>
+
+  <div class="feature-row reverse">
+    <div class="screenshot screenshot-medium">
+      <!-- <img src="img/captura-03.png" alt="Registro de tareo" class="screenshot-img"> -->
+      <div class="screenshot-corner">CAPTURA 03</div>
+      <div class="screenshot-icon">📋</div>
+      <div class="screenshot-title">Registro de tareo</div>
+      <div class="screenshot-hint">
+        Captura del listado con<br>
+        tarjetas por actividad,<br>
+        avatares de iniciales,<br>
+        pill de estado (verde/gris)<br>
+        y buscador arriba.
+      </div>
+    </div>
+    <div class="feature-text">
+      <div class="step-num">2</div>
+      <h3>Ver el tareo del día</h3>
+      <p>El supervisor ve todas las actividades del día en una vista clara: quién está trabajando, qué tarea, desde qué hora, en qué centro de costo. Un buscador filtra por trabajador, actividad, estado o CC.</p>
+      <ul class="highlights">
+        <li>Verde: actividad en curso · Gris: finalizada</li>
+        <li>Búsqueda multi-palabra (todos los términos deben coincidir)</li>
+        <li>Bulk-finalize: marca varias y ciérralas juntas</li>
+        <li>Edición y eliminación inline con confirmación</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-foot">Azoramind Tareo · Brochure</div>
+  <div class="page-num">04</div>
+</section>
+
+<!-- ═══════════════════ PÁGINA 5 — TOUR: AGENDA + DASHBOARD ═══════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">Tour del producto · 2/2</div>
+  <h2 class="section-title">Vista calendaria completa.<br>Analytics en tiempo real.</h2>
+  <div class="divider"></div>
+
+  <div class="feature-row">
+    <div class="feature-text">
+      <div class="step-num">3</div>
+      <h3>Agenda mes, semana y lista</h3>
+      <p>La agenda muestra todas las actividades del mes en 3 vistas: grilla mensual, timeline semanal con indicador de la hora actual y lista compacta con filas alineadas.</p>
+      <ul class="highlights">
+        <li>Grilla mensual sin scroll — llena la pantalla</li>
+        <li>Vista semana con franjas de 24hs + eventos lado a lado</li>
+        <li>Agrupar por trabajador o por actividad (colapsa duplicados)</li>
+        <li>Filtros por trabajador y proyecto</li>
+      </ul>
+    </div>
+    <div class="screenshot screenshot-medium">
+      <!-- <img src="img/captura-04.png" alt="Agenda mensual" class="screenshot-img"> -->
+      <div class="screenshot-corner">CAPTURA 04</div>
+      <div class="screenshot-icon">📅</div>
+      <div class="screenshot-title">Agenda mensual</div>
+      <div class="screenshot-hint">
+        Captura de la grilla del mes<br>
+        con pills de colores por día,<br>
+        el toggle Mes/Semana/Lista<br>
+        y los filtros arriba.
+      </div>
+    </div>
+  </div>
+
+  <div class="feature-row reverse">
+    <div class="screenshot screenshot-medium">
+      <!-- <img src="img/captura-05.png" alt="Dashboard Analytics" class="screenshot-img"> -->
+      <div class="screenshot-corner">CAPTURA 05</div>
+      <div class="screenshot-icon">📈</div>
+      <div class="screenshot-title">Dashboard Analytics</div>
+      <div class="screenshot-hint">
+        Captura del dashboard<br>
+        con los 6 KPI cards, la<br>
+        tendencia diaria, ranking<br>
+        de trabajadores y donut<br>
+        por categoría.
+      </div>
+    </div>
+    <div class="feature-text">
+      <div class="step-num">4</div>
+      <h3>Dashboard con KPIs y tendencias</h3>
+      <p>Toda la data se grafica en tiempo real: horas totales, tasa de finalización, ranking de trabajadores más productivos, distribución por categoría y análisis por centro de costo.</p>
+      <ul class="highlights">
+        <li>Presets: Hoy, Ayer, 7 días, 30 días, Este mes, etc.</li>
+        <li>Comparativa vs período anterior con chip de delta</li>
+        <li>Heatmap de días de la semana</li>
+        <li>Exporta Excel formateado en 1 clic</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-foot">Azoramind Tareo · Brochure</div>
+  <div class="page-num">05</div>
+</section>
+
+<!-- ═══════════════════ PÁGINA 6 — ADMIN Y CATÁLOGOS ═══════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">Configuración y setup</div>
+  <h2 class="section-title">Onboarding en horas,<br>no en semanas.</h2>
+  <div class="divider"></div>
+
+  <p class="section-lead">
+    Todo el catálogo (áreas, especialidades, centros de costo) se carga desde un Excel.
+    Si ya tienes tu plantilla contable armada, subes el archivo y en 5 segundos tienes 200+
+    CECOs listos por proyecto.
+  </p>
+
+  <div class="screenshot screenshot-medium">
+    <!-- <img src="img/captura-06.png" alt="Importador de CECOs" class="screenshot-img"> -->
+    <div class="screenshot-corner">CAPTURA 06</div>
+    <div class="screenshot-icon">📥</div>
+    <div class="screenshot-title">Importador de CECOs</div>
+    <div class="screenshot-hint">
+      Captura del modal de importación mostrando el banner "Descargar template",<br>
+      el área de subida y la vista previa con conteos de áreas/especialidades/CC.
+    </div>
+  </div>
+
+  <div class="benefit-grid" style="margin-top:14px;">
+    <div class="benefit">
+      <div class="benefit-icon gold">📄</div>
+      <div class="benefit-title">Template descargable</div>
+      <div class="benefit-desc">
+        Descarga el .xlsx con headers, 6 filas de ejemplo y hoja de instrucciones.
+        Lo llenas con tus datos y lo subes de vuelta.
+      </div>
+    </div>
+    <div class="benefit">
+      <div class="benefit-icon">🔍</div>
+      <div class="benefit-title">Vista previa antes de importar</div>
+      <div class="benefit-desc">
+        El sistema valida el Excel y muestra qué se creará. Si algo está mal, avisa
+        exactamente en qué fila y por qué.
+      </div>
+    </div>
+    <div class="benefit">
+      <div class="benefit-icon emerald">♻</div>
+      <div class="benefit-title">Idempotente</div>
+      <div class="benefit-desc">
+        Si vuelves a subir el mismo Excel con cambios, actualiza los existentes por código
+        y crea los nuevos. No duplica nada.
+      </div>
+    </div>
+    <div class="benefit">
+      <div class="benefit-icon">🎨</div>
+      <div class="benefit-title">Marca personalizable</div>
+      <div class="benefit-desc">
+        Sube tu logo, elige los colores de tu empresa, define nombre y RUC.
+        El sistema se adapta a tu identidad visual al instante.
+      </div>
+    </div>
+  </div>
+
+  <div class="page-foot">Azoramind Tareo · Brochure</div>
+  <div class="page-num">06</div>
+</section>
+
+<!-- ═══════════════════ PÁGINA 7 — CIERRE ═══════════════════ -->
+<section class="page">
+  <div class="section-eyebrow">Empieza hoy</div>
+  <h2 class="section-title">Menos planillas.<br>Más control.</h2>
+  <div class="divider"></div>
+
+  <p class="section-lead">
+    Azoramind Tareo se instala en minutos, se aprende en un día y se paga solo al primer
+    reporte que no tuviste que armar a mano. Vertical-agnóstico: funciona igual de bien
+    para una constructora, un taller industrial o una empresa de servicios.
+  </p>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-num">Web</div>
+      <div class="stat-label">Panel completo</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">Móvil</div>
+      <div class="stat-label">Android · iOS</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">Cloud</div>
+      <div class="stat-label">Sin instalar nada</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">Seguro</div>
+      <div class="stat-label">Datos siempre tuyos</div>
+    </div>
+  </div>
+
+  <div style="margin-top:14px;">
+    <h3 style="font-size:13pt; font-weight:700; color:var(--slate-900); margin-bottom:10px;">Incluido en cada instalación</h3>
+    <ul>
+      <li><strong>App web</strong> completa con dashboard, agenda y admin</li>
+      <li><strong>App móvil</strong> Android e iOS para el equipo de campo</li>
+      <li><strong>Backend en tu dominio</strong> — datos siempre tuyos</li>
+      <li><strong>Configuración inicial</strong> — usuarios, roles, catálogos y branding</li>
+      <li><strong>Capacitación</strong> al equipo administrativo (1-2 sesiones)</li>
+      <li><strong>Soporte por email</strong> en 24 horas hábiles</li>
+    </ul>
+  </div>
+
+  <div class="cta">
+    <div class="cta-title">¿Listo para empezar?</div>
+    <div class="cta-sub">
+      Coordina una demo o pídenos una cotización personalizada. Te respondemos el mismo día.
+    </div>
+    <div class="cta-info">
+      <div>
+        <div class="cta-info-label">Empresa</div>
+        <div class="cta-info-value">Azoramind</div>
+      </div>
+      <div>
+        <div class="cta-info-label">Email</div>
+        <div class="cta-info-value"><a href="mailto:contacto@azoramind.com">contacto@azoramind.com</a></div>
+      </div>
+      <div>
+        <div class="cta-info-label">Web</div>
+        <div class="cta-info-value"><a href="https://azoramind.com">azoramind.com</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-foot">Azoramind Tareo · Brochure</div>
+  <div class="page-num">07</div>
+</section>
+
+</body>
+</html>
