@@ -177,6 +177,104 @@ def parse_ceco_workbook(file_bytes: bytes) -> Dict[str, Any]:
     }
 
 
+def build_template_xlsx() -> bytes:
+    """Genera un Excel template con:
+    - Header en formato esperado (matchea los aliases del importer)
+    - 6 filas de ejemplo que muestran la jerarquía y patrones típicos
+    - Columnas dimensionadas para que se lea sin scroll horizontal
+    - Header con formato (bold, bg color) para que el usuario no lo edite
+    """
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "CecoAzoramind"
+
+    headers = [
+        "Cod01", "Area",
+        "Cod02", "Especialidad",
+        "Cod03", "CentroCosto",
+        "TipoCosto", "CodigoCeco", "CecoPalma", "Descripcion",
+    ]
+    ws.append(headers)
+
+    # Estilo del header
+    header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_align = Alignment(horizontal="left", vertical="center", wrap_text=False)
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_align
+    ws.row_dimensions[1].height = 22
+
+    # Ejemplos: dos áreas, cada una con dos especialidades, cada una con
+    # los 4 CC típicos (Mano de Obra / Materiales / Equipos / Subcontratos).
+    # Muestra el patrón de códigos que el usuario debe replicar.
+    examples = [
+        # (cod01, area, cod02, esp, cod03, cc, tipocosto, codigoceco, cecopalma, desc)
+        (22, "Trabajos y Obras Preliminares", 11, "Vias de Acceso",         1, "Mano de Obra",          "Costo Directo Inc. IGV", "221101", "P00409", ""),
+        (22, "Trabajos y Obras Preliminares", 11, "Vias de Acceso",         2, "Materiales",            "Costo Directo Inc. IGV", "221102", "P00409", ""),
+        (22, "Trabajos y Obras Preliminares", 11, "Vias de Acceso",         3, "Equipos y Herramientas","Costo Directo Inc. IGV", "221103", "P00409", ""),
+        (22, "Trabajos y Obras Preliminares", 13, "Trabajos Preliminares",  1, "Mano de Obra",          "Costo Directo Inc. IGV", "221301", "P00409", ""),
+        (23, "Obras Iniciales",               10, "Cerco Perimetrico",      1, "Mano de Obra",          "Costo Directo Inc. IGV", "231001", "P00401", "Ejemplo de descripción"),
+        (23, "Obras Iniciales",               10, "Cerco Perimetrico",      2, "Materiales",            "Costo Directo Inc. IGV", "231002", "P00401", ""),
+    ]
+    for row in examples:
+        ws.append(row)
+
+    # Ancho de columnas
+    widths = [7, 32, 7, 30, 7, 26, 22, 12, 10, 30]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    # Freeze pane debajo del header
+    ws.freeze_panes = "A2"
+
+    # Segunda hoja con instrucciones
+    ws2 = wb.create_sheet(title="Instrucciones")
+    instrucciones = [
+        ["Importador de CECOs — Guía rápida"],
+        [""],
+        ["Columnas OBLIGATORIAS:"],
+        ["  Cod01", "Código numérico del área (ej: 22)"],
+        ["  Area", "Nombre del área (ej: Trabajos y Obras Preliminares)"],
+        ["  Cod03", "Código numérico del centro de costo (ej: 1)"],
+        ["  CentroCosto", "Nombre del CC (ej: Mano de Obra)"],
+        [""],
+        ["Columnas OPCIONALES:"],
+        ["  Cod02", "Código numérico de la especialidad (default: 0)"],
+        ["  Especialidad", "Nombre de la especialidad (default: GENERAL)"],
+        ["  TipoCosto", "ej: Costo Directo Inc. IGV, Indirecto, Gastos Generales"],
+        ["  CodigoCeco", "Código concatenado del CC (ej: 221101)"],
+        ["  CecoPalma", "Código alterno (opcional)"],
+        ["  Descripcion", "Detalle libre (opcional)"],
+        [""],
+        ["Reglas:"],
+        ["  · Los códigos se scopean por proyecto. Podés usar 'Cod01=10' en 2 proyectos"],
+        ["    distintos con significados diferentes."],
+        ["  · La importación es idempotente: si volvés a subir el mismo Excel, actualiza"],
+        ["    los existentes y no duplica."],
+        ["  · Se identifican por códigos: (proyecto, Cod01) para áreas,"],
+        ["    (Área, Cod02) para especialidades, (Especialidad, Cod03) para CC."],
+        [""],
+        ["Máximo del archivo: 5 MB"],
+    ]
+    for row in instrucciones:
+        ws2.append(row)
+    ws2.cell(row=1, column=1).font = Font(bold=True, size=14, color="1E40AF")
+    ws2.column_dimensions["A"].width = 24
+    ws2.column_dimensions["B"].width = 70
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def import_to_proyecto(proyecto_id: UUID, parsed: Dict[str, Any]) -> Dict[str, Any]:
     """Aplica el parseado a un proyecto. Idempotente + transaccional.
 

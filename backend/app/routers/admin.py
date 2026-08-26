@@ -2,10 +2,10 @@
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, EmailStr, Field
 
-from app.services.ceco_importer import parse_ceco_workbook, import_to_proyecto
+from app.services.ceco_importer import build_template_xlsx, parse_ceco_workbook, import_to_proyecto
 
 from app.auth.dependencies import require_role
 from app.auth.password import hash_password
@@ -590,6 +590,21 @@ def reorder_categorias(payload: ReorderPayload):
 # ============================================================
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+@router.get("/proyectos/ceco-template")
+def download_ceco_template():
+    """Descarga un Excel template con headers correctos + 6 filas de ejemplo
+    + hoja de instrucciones. El usuario lo baja, lo llena, y lo sube.
+    """
+    xlsx_bytes = build_template_xlsx()
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="template_cecos_azoramind.xlsx"',
+        },
+    )
 
 
 @router.post("/proyectos/{proyecto_id}/preview-cecos")

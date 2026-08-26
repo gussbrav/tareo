@@ -36,5 +36,9 @@ export const adminApi = {
       uploadFile(`/api/admin/proyectos/${proyectoId}/preview-cecos`, file),
     importar: (proyectoId, file) =>
       uploadFile(`/api/admin/proyectos/${proyectoId}/importar-cecos`, file),
+    // Descarga blob del template — el caller crea el <a> temporal para triggear el save
+    downloadTemplate: () =>
+      api.get('/api/admin/proyectos/ceco-template', { responseType: 'blob' })
+        .then((r) => r.data),
   },
 }

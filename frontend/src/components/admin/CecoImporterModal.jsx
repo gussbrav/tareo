@@ -22,6 +22,27 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
   const [preview, setPreview] = useState(null)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
+
+  const handleDownloadTemplate = async () => {
+    setError('')
+    setDownloadingTemplate(true)
+    try {
+      const blob = await adminApi.cecoImporter.downloadTemplate()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'template_cecos_azoramind.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError('No se pudo descargar el template. Reintentá en un momento.')
+    } finally {
+      setDownloadingTemplate(false)
+    }
+  }
 
   const reset = () => {
     setFile(null); setPreview(null); setResult(null); setError('')
@@ -84,6 +105,29 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
       <div className="p-5 space-y-4">
         {phase === 'idle' && (
           <>
+            {/* Banner del template para que el usuario sepa el formato exacto */}
+            <div className="rounded-lg bg-brand-50 border border-brand-100 p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-md bg-white border border-brand-200 flex items-center justify-center shrink-0">
+                <Icon.General className="w-4 h-4 text-brand-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-800">¿Primera vez?</p>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Descargá el template con headers, ejemplos y guía de campos.
+                  Llenalo con tus datos y volvé a subirlo.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary btn-sm shrink-0"
+                onClick={handleDownloadTemplate}
+                disabled={downloadingTemplate}
+              >
+                <Icon.ArrowDown className="w-4 h-4" />
+                {downloadingTemplate ? 'Descargando…' : 'Descargar template'}
+              </button>
+            </div>
+
             <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
               <Icon.Layers className="w-8 h-8 mx-auto text-slate-400" />
               <p className="mt-2 text-sm font-medium text-slate-700">Subí el Excel de CECOs</p>
