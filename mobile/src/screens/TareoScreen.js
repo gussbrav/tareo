@@ -240,6 +240,17 @@ export default function TareoScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* Page header — patrón Appsmith original: título grande visible
+          para dar contexto al usuario nuevo. */}
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle}>Registro de tareo</Text>
+        {items.length > 0 ? (
+          <Text style={styles.pageSubtitle}>
+            {items.length} {items.length === 1 ? 'actividad' : 'actividades'}
+          </Text>
+        ) : null}
+      </View>
+
       {/* Date bar */}
       <View style={styles.dateBar}>
         <Pressable
@@ -546,6 +557,19 @@ function EmptyEstado({ filter, onReset }) {
 // ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
+
+  // Page header (título de la vista)
+  pageHeader: {
+    flexDirection: 'row', alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.base,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.surface,
+    gap: spacing.md,
+  },
+  pageTitle: { ...type.h1, color: colors.text.primary },
+  pageSubtitle: { ...type.caption, color: colors.text.tertiary, fontWeight: '600' },
 
   // Date bar
   dateBar: {
