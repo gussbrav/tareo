@@ -1,15 +1,19 @@
 /**
- * TareoScreen — lista del día con búsqueda y finalización masiva.
+ * TareoScreen — lista del día con búsqueda, filtro de estado y bulk
+ * finalize al patrón Appsmith Grecia (barra top permanente):
  *
- * Header sticky: date bar + search bar (siempre visible) + select-all bar
- * (aparece cuando hay ≥2 iniciadas en el resultado filtrado).
+ * Header sticky:
+ *   - Date bar (chevrons + DateField + Hoy)
+ *   - Search bar (debounce 250 ms, insensible a acentos)
+ *   - Chips segmented: Todas · Iniciadas · Finalizadas (con contadores)
+ *   - Bulk bar (checkbox "Seleccionar todos" + botón "Finalizar (N)"
+ *     SIEMPRE visible cuando hay ≥1 iniciada visible, disabled si N=0.
+ *     Patrón Appsmith explícito solicitado por el cliente.)
  *
- * Cards: checkbox 24×24 a la izquierda para iniciadas, checkmark verde para
- * finalizadas. Card seleccionada con borde brand + tint brand-50.
- *
- * Batch action bar sticky bottom: aparece slide-up cuando hay N seleccionadas
- * con "Cancelar · N seleccionadas · Finalizar (N)". Confirma con Alert.
- * Feedback: Toast bottom 2.5 s en éxito / error.
+ * Cards: checkbox 24×24 a la izquierda para iniciadas, checkmark verde
+ * para finalizadas. Card seleccionada: border brand-600 + tint brand-50.
+ * Confirmación con Alert antes de POST /api/actividades/finalizar-batch.
+ * Feedback: toast bottom 2.5 s (success/error).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
@@ -17,7 +21,6 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
-  Easing,
   FlatList,
   Pressable,
   RefreshControl,
@@ -27,11 +30,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { actividadesApi } from '../api/actividades'
 import { useAuthStore } from '../store/auth'
-import { colors, radius, shadow, spacing, type } from '../theme'
+import { colors, pastelFor, radius, shadow, spacing, type } from '../theme'
 import DateField from '../ui/DateField'
 import Icon from '../ui/Icons'
 
@@ -43,8 +46,22 @@ const today = () => {
   const dd = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${dd}`
 }
-
 const fmtHM = (t) => (t ? String(t).slice(0, 5) : '--:--')
+
+const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+const fmtDateShort = (iso) => {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso + 'T12:00:00')
+    if (isNaN(d.getTime())) return ''
+    return `${d.getDate()} ${MESES_CORTOS[d.getMonth()]}`
+  } catch { return '' }
+}
+
+const iniciales = (nombre) => {
+  if (!nombre) return '??'
+  return nombre.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+}
 
 /** Normaliza tildes y baja a minúsculas para búsqueda insensible a acentos. */
 const norm = (s) =>
@@ -53,7 +70,6 @@ const norm = (s) =>
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
 
-// Hook de debounce simple — evita re-render por cada tecla al buscar.
 function useDebounced(value, delay = 250) {
   const [v, setV] = useState(value)
   useEffect(() => {
@@ -63,27 +79,31 @@ function useDebounced(value, delay = 250) {
   return v
 }
 
+const ESTADO_FILTERS = [
+  { key: 'todas',       label: 'Todas' },
+  { key: 'iniciadas',   label: 'Iniciadas' },
+  { key: 'finalizadas', label: 'Finalizadas' },
+]
+
 // ─── Screen ────────────────────────────────────────────────────────────────
 export default function TareoScreen({ navigation }) {
   const { user } = useAuthStore()
-  const insets = useSafeAreaInsets()
   const [fecha, setFecha] = useState(today())
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
-  // Search
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebounced(query, 250)
   const [searchFocused, setSearchFocused] = useState(false)
 
-  // Selección múltiple (solo iniciadas)
+  const [estadoFilter, setEstadoFilter] = useState('todas')
+
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [finalizing, setFinalizing] = useState(false)
 
-  // Toast
-  const [toast, setToast] = useState(null) // { msg, kind: 'ok'|'err' }
+  const [toast, setToast] = useState(null)
 
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor'
   const canFinalize = canEdit
@@ -106,8 +126,8 @@ export default function TareoScreen({ navigation }) {
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
-  // ── Filtrado por búsqueda ────────────────────────────────────────────────
-  const filtered = useMemo(() => {
+  // ── Filtrado por query + estado ─────────────────────────────────────────
+  const bySearch = useMemo(() => {
     const q = norm(debouncedQuery.trim())
     if (!q) return items
     return items.filter((it) =>
@@ -118,14 +138,23 @@ export default function TareoScreen({ navigation }) {
     )
   }, [items, debouncedQuery])
 
+  const totalIniciadas = useMemo(
+    () => bySearch.filter((it) => it.desestadoactividad === 'iniciado').length,
+    [bySearch],
+  )
+  const totalFinalizadas = bySearch.length - totalIniciadas
+
+  const filtered = useMemo(() => {
+    if (estadoFilter === 'iniciadas') return bySearch.filter((it) => it.desestadoactividad === 'iniciado')
+    if (estadoFilter === 'finalizadas') return bySearch.filter((it) => it.desestadoactividad !== 'iniciado')
+    return bySearch
+  }, [bySearch, estadoFilter])
+
   const iniciadasVisibles = useMemo(
     () => filtered.filter((it) => it.desestadoactividad === 'iniciado'),
     [filtered],
   )
-  const iniciadasIds = useMemo(
-    () => iniciadasVisibles.map((it) => it.id),
-    [iniciadasVisibles],
-  )
+  const iniciadasIds = useMemo(() => iniciadasVisibles.map((it) => it.id), [iniciadasVisibles])
   const allSelected =
     iniciadasVisibles.length > 0 &&
     iniciadasVisibles.every((it) => selectedIds.has(it.id))
@@ -134,14 +163,12 @@ export default function TareoScreen({ navigation }) {
   const toggleOne = (id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
   }
   const toggleAll = () => {
     if (allSelected) {
-      // Deselecciona solo las visibles (mantiene otras del set)
       setSelectedIds((prev) => {
         const next = new Set(prev)
         iniciadasIds.forEach((id) => next.delete(id))
@@ -155,7 +182,6 @@ export default function TareoScreen({ navigation }) {
       })
     }
   }
-  const clearSelection = () => setSelectedIds(new Set())
 
   const showToast = (msg, kind = 'ok') => {
     setToast({ msg, kind })
@@ -191,16 +217,6 @@ export default function TareoScreen({ navigation }) {
     )
   }
 
-  const finalizeOne = async (id) => {
-    try {
-      await actividadesApi.finalizarUna(id)
-      showToast('Actividad finalizada', 'ok')
-      load()
-    } catch {
-      showToast('No pudimos finalizar. Intenta de nuevo.', 'err')
-    }
-  }
-
   const changeDay = (delta) => {
     const d = new Date(fecha + 'T12:00:00')
     d.setDate(d.getDate() + delta)
@@ -210,12 +226,17 @@ export default function TareoScreen({ navigation }) {
     setFecha(`${y}-${m}-${dd}`)
   }
 
-  // Empty state selector
   const emptyKind = useMemo(() => {
     if (items.length === 0) return 'no-day'
-    if (filtered.length === 0 && debouncedQuery.trim()) return 'no-search'
+    if (bySearch.length === 0 && debouncedQuery.trim()) return 'no-search'
+    if (filtered.length === 0 && estadoFilter !== 'todas') return 'no-estado'
     return null
-  }, [items, filtered, debouncedQuery])
+  }, [items, bySearch, filtered, debouncedQuery, estadoFilter])
+
+  // Cantidad de iniciadas visibles según el filtro activo
+  // (se usa para habilitar/deshabilitar el botón Finalizar del bulk bar)
+  const nSelected = selectedIds.size
+  const bulkVisible = canFinalize && (iniciadasVisibles.length > 0 || nSelected > 0)
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -271,21 +292,84 @@ export default function TareoScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Select-all bar — solo si hay ≥2 iniciadas visibles */}
-      {canFinalize && iniciadasVisibles.length >= 2 && (
-        <Pressable
-          onPress={toggleAll}
-          style={styles.selectAllBar}
-          android_ripple={{ color: colors.surfaceSubtle }}
-          accessibilityLabel={allSelected ? 'Deseleccionar todas' : 'Seleccionar todas las iniciadas'}
-        >
-          <View style={[styles.checkbox, allSelected && styles.checkboxOn]}>
-            {allSelected ? <Text style={styles.checkboxTick}>✓</Text> : null}
-          </View>
-          <Text style={styles.selectAllText}>
-            {allSelected ? 'Deseleccionar todas' : 'Seleccionar todas'} ({iniciadasVisibles.length})
-          </Text>
-        </Pressable>
+      {/* Chips estado con contadores */}
+      <View style={styles.chipsWrap}>
+        {ESTADO_FILTERS.map((f) => {
+          const active = estadoFilter === f.key
+          const count = f.key === 'iniciadas'
+            ? totalIniciadas
+            : f.key === 'finalizadas'
+              ? totalFinalizadas
+              : bySearch.length
+          return (
+            <Pressable
+              key={f.key}
+              onPress={() => setEstadoFilter(f.key)}
+              style={[styles.chip, active && styles.chipActive]}
+              android_ripple={{ color: colors.surfaceSubtle }}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
+              <View style={[styles.chipCount, active && styles.chipCountActive]}>
+                <Text style={[styles.chipCountText, active && styles.chipCountTextActive]}>{count}</Text>
+              </View>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      {/* Bulk bar (patrón Appsmith): siempre visible cuando hay iniciadas */}
+      {bulkVisible && (
+        <View style={styles.bulkBar}>
+          <Pressable
+            onPress={toggleAll}
+            style={styles.selectAllInline}
+            android_ripple={{ color: colors.surfaceSubtle }}
+            accessibilityLabel={allSelected ? 'Deseleccionar todas' : 'Seleccionar todas las iniciadas'}
+            disabled={iniciadasVisibles.length === 0}
+          >
+            <View style={[
+              styles.checkbox,
+              allSelected && styles.checkboxOn,
+              iniciadasVisibles.length === 0 && styles.checkboxDisabled,
+            ]}>
+              {allSelected ? <Text style={styles.checkboxTick}>✓</Text> : null}
+            </View>
+            <Text style={[
+              styles.selectAllInlineText,
+              iniciadasVisibles.length === 0 && { color: colors.text.muted },
+            ]}>
+              Seleccionar todos
+            </Text>
+          </Pressable>
+
+          <TouchableOpacity
+            onPress={finalizarBatch}
+            disabled={nSelected === 0 || finalizing}
+            style={[
+              styles.finalizeBulkBtn,
+              (nSelected === 0 || finalizing) && styles.finalizeBulkBtnDisabled,
+            ]}
+          >
+            {finalizing ? (
+              <ActivityIndicator color={colors.text.inverse} />
+            ) : (
+              <>
+                <Icon
+                  name="check"
+                  size={16}
+                  color={nSelected === 0 ? colors.text.muted : colors.text.inverse}
+                  strokeWidth={2.5}
+                />
+                <Text style={[
+                  styles.finalizeBulkText,
+                  nSelected === 0 && styles.finalizeBulkTextDisabled,
+                ]}>
+                  Finalizar {nSelected > 0 ? `(${nSelected})` : 'actividad'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       )}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -297,14 +381,13 @@ export default function TareoScreen({ navigation }) {
         <EmptyDay canCreate={canEdit} onCreate={() => navigation.navigate('Nueva')} />
       ) : emptyKind === 'no-search' ? (
         <EmptySearch query={debouncedQuery} onClear={() => setQuery('')} />
+      ) : emptyKind === 'no-estado' ? (
+        <EmptyEstado filter={estadoFilter} onReset={() => setEstadoFilter('todas')} />
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(it) => it.id}
-          contentContainerStyle={{
-            padding: spacing.md,
-            paddingBottom: selectedIds.size > 0 ? 120 : spacing['4xl'],
-          }}
+          contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing['4xl'] }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -316,40 +399,41 @@ export default function TareoScreen({ navigation }) {
           renderItem={({ item }) => {
             const iniciada = item.desestadoactividad === 'iniciado'
             const selected = selectedIds.has(item.id)
+            const pastel = pastelFor(item.trabajador_nombre)
+            const fechaCorta = fmtDateShort(item.fecactividad || fecha)
             return (
               <Pressable
                 onPress={() => iniciada && canFinalize && toggleOne(item.id)}
                 android_ripple={iniciada && canFinalize ? { color: colors.surfaceSubtle } : null}
                 style={[styles.card, selected && styles.cardSelected]}
               >
-                <View style={styles.cardBody}>
-                  {/* Checkbox / check final */}
-                  {canFinalize && iniciada ? (
-                    <View style={[styles.checkbox, selected && styles.checkboxOn]}>
-                      {selected ? <Text style={styles.checkboxTick}>✓</Text> : null}
+                {/* Row 1: avatar + nombre + fecha (top-right, Gmail) */}
+                <View style={styles.cardRow}>
+                  <View style={styles.avatarWrap}>
+                    <View style={[styles.avatar, { backgroundColor: pastel.bg }]}>
+                      <Text style={[styles.avatarText, { color: pastel.fg }]}>
+                        {iniciales(item.trabajador_nombre)}
+                      </Text>
                     </View>
-                  ) : !iniciada ? (
-                    <View style={styles.doneMark}>
-                      <Text style={styles.doneMarkText}>✓</Text>
-                    </View>
-                  ) : null}
+                    {selected && (
+                      <View style={styles.avatarCheck}>
+                        <Text style={styles.avatarCheckText}>✓</Text>
+                      </View>
+                    )}
+                  </View>
 
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <View style={styles.rowBetween}>
+                  <View style={styles.cardMain}>
+                    <View style={styles.cardTopRow}>
                       <Text style={styles.trabajador} numberOfLines={1}>
                         {item.trabajador_nombre}
                       </Text>
-                      {canEdit && (
-                        <TouchableOpacity
-                          hitSlop={8}
-                          onPress={() => navigation.navigate('EditarActividad', { actividadId: item.id })}
-                        >
-                          <Text style={styles.editLink}>Editar</Text>
-                        </TouchableOpacity>
-                      )}
+                      <Text style={styles.dateTop}>{fechaCorta}</Text>
                     </View>
-                    <Text style={styles.desc} numberOfLines={3}>{item.desactividad}</Text>
-                    <View style={styles.meta}>
+
+                    <Text style={styles.desc} numberOfLines={2}>{item.desactividad}</Text>
+
+                    {/* Row 2: estado + hora + editar (bottom-right, Gmail) */}
+                    <View style={styles.cardBottomRow}>
                       <View style={[
                         styles.badge,
                         iniciada ? styles.badgeIniciada : styles.badgeFinalizada,
@@ -365,17 +449,19 @@ export default function TareoScreen({ navigation }) {
                           {iniciada ? 'Iniciada' : 'Finalizada'}
                         </Text>
                       </View>
-                      <Text style={styles.hora}>
+                      <Text style={styles.hora} numberOfLines={1}>
                         {fmtHM(item.horinicio)}{item.horfin ? ` → ${fmtHM(item.horfin)}` : ''}
                       </Text>
+                      <View style={{ flex: 1 }} />
+                      {canEdit && (
+                        <TouchableOpacity
+                          hitSlop={8}
+                          onPress={() => navigation.navigate('EditarActividad', { actividadId: item.id })}
+                        >
+                          <Text style={styles.editLink}>Editar</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
-
-                    {/* Finalizar single — solo si hay 0 selected y es iniciada */}
-                    {iniciada && canFinalize && selectedIds.size === 0 && (
-                      <TouchableOpacity style={styles.finalizeBtn} onPress={() => finalizeOne(item.id)}>
-                        <Text style={styles.finalizeBtnText}>Finalizar</Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
                 </View>
               </Pressable>
@@ -384,60 +470,8 @@ export default function TareoScreen({ navigation }) {
         />
       )}
 
-      {/* Batch action bar sticky bottom */}
-      {selectedIds.size > 0 && (
-        <BatchBar
-          count={selectedIds.size}
-          onCancel={clearSelection}
-          onConfirm={finalizarBatch}
-          finalizing={finalizing}
-          insetsBottom={insets.bottom}
-        />
-      )}
-
-      {/* Toast */}
       {toast && <Toast msg={toast.msg} kind={toast.kind} />}
     </SafeAreaView>
-  )
-}
-
-// ─── BatchBar ──────────────────────────────────────────────────────────────
-function BatchBar({ count, onCancel, onConfirm, finalizing, insetsBottom }) {
-  const slide = useRef(new Animated.Value(80)).current
-  useEffect(() => {
-    Animated.timing(slide, {
-      toValue: 0, duration: 200, easing: Easing.out(Easing.ease), useNativeDriver: true,
-    }).start()
-  }, [slide])
-
-  return (
-    <Animated.View
-      style={[
-        styles.batchBar,
-        {
-          paddingBottom: 12 + insetsBottom,
-          transform: [{ translateY: slide }],
-        },
-      ]}
-    >
-      <TouchableOpacity onPress={onCancel} disabled={finalizing} hitSlop={8}>
-        <Text style={styles.batchCancel}>Cancelar</Text>
-      </TouchableOpacity>
-      <Text style={styles.batchCount}>
-        {count} {count === 1 ? 'seleccionada' : 'seleccionadas'}
-      </Text>
-      <TouchableOpacity
-        onPress={onConfirm}
-        style={[styles.batchConfirm, finalizing && { opacity: 0.6 }]}
-        disabled={finalizing}
-      >
-        {finalizing ? (
-          <ActivityIndicator color={colors.text.inverse} />
-        ) : (
-          <Text style={styles.batchConfirmText}>Finalizar ({count})</Text>
-        )}
-      </TouchableOpacity>
-    </Animated.View>
   )
 }
 
@@ -493,17 +527,31 @@ function EmptySearch({ query, onClear }) {
   )
 }
 
+function EmptyEstado({ filter, onReset }) {
+  const label = filter === 'iniciadas' ? 'iniciadas' : 'finalizadas'
+  return (
+    <View style={styles.emptyWrap}>
+      <View style={styles.emptyIconBig}>
+        <Icon name="list" size={30} color={colors.text.tertiary} />
+      </View>
+      <Text style={styles.emptyTitle}>No hay actividades {label}</Text>
+      <Text style={styles.emptyHint}>Cambia el filtro para ver otras actividades.</Text>
+      <TouchableOpacity onPress={onReset}>
+        <Text style={styles.linkAction}>Ver todas</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
 // ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
 
-  // ── Date bar
+  // Date bar
   dateBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.surface,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md, paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },
   arrowBtn: {
@@ -522,44 +570,80 @@ const styles = StyleSheet.create({
   todayText: { ...type.label, color: colors.text.secondary, fontWeight: '600' },
   todayTextActive: { color: colors.text.inverse, fontWeight: '700' },
 
-  // ── Search
+  // Search
   searchWrap: {
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.base,
     paddingBottom: spacing.md,
   },
   searchBar: {
-    height: 44,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceSubtle,
+    height: 44, paddingHorizontal: spacing.md,
+    borderRadius: radius.md, backgroundColor: colors.surfaceSubtle,
     borderWidth: 1, borderColor: colors.border,
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
   },
-  searchBarFocused: {
-    backgroundColor: colors.surface,
-    borderColor: colors.brand[600],
-  },
-  searchInput: {
-    flex: 1, ...type.body,
-    color: colors.text.primary, padding: 0,
-  },
+  searchBarFocused: { backgroundColor: colors.surface, borderColor: colors.brand[600] },
+  searchInput: { flex: 1, ...type.body, color: colors.text.primary, padding: 0 },
   clearBtn: {
     width: 20, height: 20, borderRadius: 10,
     backgroundColor: colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // ── Select-all bar
-  selectAllBar: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    paddingHorizontal: spacing.base + 4,
-    paddingVertical: 10,
+  // Chips estado
+  chipsWrap: {
+    flexDirection: 'row', gap: spacing.sm,
+    paddingHorizontal: spacing.base, paddingBottom: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    height: 32, paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  chipActive: { backgroundColor: colors.brand[600], borderColor: colors.brand[600] },
+  chipText: { ...type.caption, color: colors.text.secondary, fontWeight: '600' },
+  chipTextActive: { color: colors.text.inverse, fontWeight: '700' },
+  chipCount: {
+    minWidth: 20, paddingHorizontal: 5, paddingVertical: 1,
+    borderRadius: radius.pill, backgroundColor: colors.surfaceSubtle,
+    alignItems: 'center',
+  },
+  chipCountActive: { backgroundColor: 'rgba(255,255,255,0.25)' },
+  chipCountText: { fontSize: 10, fontWeight: '700', color: colors.text.tertiary, fontVariant: ['tabular-nums'] },
+  chipCountTextActive: { color: colors.text.inverse },
+
+  // Bulk bar (patrón Appsmith)
+  bulkBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
     backgroundColor: colors.surface,
     borderTopWidth: 1, borderTopColor: colors.border,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  selectAllText: { ...type.label, color: colors.text.secondary, fontWeight: '600' },
+  selectAllInline: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingVertical: 6, paddingRight: spacing.md,
+  },
+  selectAllInlineText: { ...type.label, color: colors.text.secondary, fontWeight: '600' },
+  finalizeBulkBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    height: 40, paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.brand[600],
+    justifyContent: 'center', minWidth: 140,
+  },
+  finalizeBulkBtnDisabled: {
+    backgroundColor: colors.surfaceSubtle,
+  },
+  finalizeBulkText: {
+    ...type.label, color: colors.text.inverse, fontWeight: '700',
+  },
+  finalizeBulkTextDisabled: { color: colors.text.muted, fontWeight: '600' },
 
   error: {
     marginHorizontal: spacing.md, marginTop: spacing.md,
@@ -568,11 +652,10 @@ const styles = StyleSheet.create({
     ...type.body,
   },
 
-  // ── Card
+  // Card compacta Gmail-style
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    marginBottom: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    marginBottom: spacing.sm,
     borderWidth: 1.5, borderColor: 'transparent',
     ...shadow.card,
   },
@@ -580,96 +663,82 @@ const styles = StyleSheet.create({
     borderColor: colors.brand[600],
     backgroundColor: colors.brand[50],
   },
-  cardBody: {
+  cardRow: {
     flexDirection: 'row',
-    padding: spacing.base,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     gap: spacing.md,
   },
+  cardMain: { flex: 1, minWidth: 0 },
 
-  // ── Checkbox (iniciada) / check (finalizada)
+  // Avatar iniciales — reemplaza el checkbox/tick anterior
+  avatarWrap: { position: 'relative' },
+  avatar: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
+  avatarCheck: {
+    position: 'absolute', right: -2, bottom: -2,
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: colors.brand[600],
+    borderWidth: 2, borderColor: colors.surface,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarCheckText: { color: colors.text.inverse, fontSize: 10, fontWeight: '900', lineHeight: 10 },
+
+  // Bulk checkbox (barra top) — legacy, sigue usándose en Seleccionar todos
   checkbox: {
-    width: 24, height: 24, borderRadius: 6,
+    width: 22, height: 22, borderRadius: 6,
     borderWidth: 1.5, borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
-    marginTop: 2,
   },
-  checkboxOn: {
-    backgroundColor: colors.brand[600],
-    borderColor: colors.brand[600],
-  },
-  checkboxTick: { color: colors.text.inverse, fontSize: 14, fontWeight: '900', lineHeight: 14 },
-  doneMark: {
-    width: 24, height: 24, borderRadius: 12,
-    backgroundColor: colors.success[50],
-    alignItems: 'center', justifyContent: 'center',
-    marginTop: 2,
-  },
-  doneMarkText: { color: colors.success[600], fontSize: 14, fontWeight: '900', lineHeight: 14 },
+  checkboxOn: { backgroundColor: colors.brand[600], borderColor: colors.brand[600] },
+  checkboxDisabled: { borderColor: colors.border, backgroundColor: colors.surfaceSubtle },
+  checkboxTick: { color: colors.text.inverse, fontSize: 13, fontWeight: '900', lineHeight: 13 },
 
-  rowBetween: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  cardTopRow: {
+    flexDirection: 'row', alignItems: 'center',
     gap: spacing.sm,
   },
-  trabajador: { ...type.bodyStrong, color: colors.text.primary, flex: 1 },
-  editLink: { ...type.caption, color: colors.brand[600], fontWeight: '700' },
-  desc: { ...type.body, color: colors.text.secondary, marginTop: spacing.xs + 2 },
-  meta: {
-    flexDirection: 'row', alignItems: 'center',
-    marginTop: spacing.md, gap: spacing.md, flexWrap: 'wrap',
+  trabajador: { ...type.bodyStrong, fontSize: 14, color: colors.text.primary, flex: 1 },
+  dateTop: {
+    ...type.caption, fontSize: 11, color: colors.text.muted,
+    fontWeight: '500', fontVariant: ['tabular-nums'],
   },
+
+  desc: {
+    ...type.body, fontSize: 13, lineHeight: 18,
+    color: colors.text.secondary, marginTop: 2,
+  },
+
+  cardBottomRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  editLink: { ...type.caption, color: colors.brand[600], fontWeight: '700', paddingVertical: 2 },
   badge: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 8, paddingVertical: 3,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 7, paddingVertical: 2,
     borderRadius: radius.pill,
   },
   badgeIniciada: { backgroundColor: colors.success[50] },
   badgeFinalizada: { backgroundColor: colors.surfaceSubtle },
-  badgeDot: { width: 6, height: 6, borderRadius: 3 },
+  badgeDot: { width: 5, height: 5, borderRadius: 3 },
   badgeDotIniciada: { backgroundColor: colors.success[500] },
   badgeDotFinalizada: { backgroundColor: colors.text.muted },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  hora: { ...type.caption, color: colors.text.tertiary, fontVariant: ['tabular-nums'] },
+  badgeText: { fontSize: 10, fontWeight: '700' },
+  hora: { fontSize: 11, color: colors.text.tertiary, fontVariant: ['tabular-nums'] },
 
-  finalizeBtn: {
-    marginTop: spacing.md, backgroundColor: colors.brand[600],
-    borderRadius: radius.md, paddingVertical: 10, alignItems: 'center',
-    minHeight: 40, justifyContent: 'center',
-  },
-  finalizeBtnText: { ...type.label, color: colors.text.inverse, fontWeight: '700' },
-
-  // ── Batch bar
-  batchBar: {
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    paddingHorizontal: spacing.base, paddingTop: spacing.md,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1, borderTopColor: colors.border,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1, shadowRadius: 8, elevation: 12,
-  },
-  batchCancel: { ...type.body, color: colors.text.secondary, paddingVertical: 8, paddingHorizontal: 4 },
-  batchCount: { ...type.caption, color: colors.text.secondary, fontWeight: '600' },
-  batchConfirm: {
-    backgroundColor: colors.brand[600],
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-    borderRadius: radius.md, minHeight: 44, minWidth: 140,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  batchConfirmText: { ...type.body, color: colors.text.inverse, fontWeight: '700' },
-
-  // ── Toast
   toast: {
-    position: 'absolute', bottom: 100, left: spacing.base, right: spacing.base,
+    position: 'absolute', bottom: 24, left: spacing.base, right: spacing.base,
     paddingVertical: 12, paddingHorizontal: 16,
-    borderRadius: radius.md,
-    alignItems: 'center',
+    borderRadius: radius.md, alignItems: 'center',
     ...shadow.floating,
   },
   toastText: { color: colors.text.inverse, ...type.body, fontWeight: '600' },
 
-  // ── Empty states
   emptyWrap: {
     alignItems: 'center', paddingVertical: spacing['4xl'], paddingHorizontal: spacing.lg,
   },
@@ -682,8 +751,7 @@ const styles = StyleSheet.create({
   emptyTitle: { ...type.h2, color: colors.text.primary, textAlign: 'center' },
   emptyHint: {
     ...type.body, color: colors.text.tertiary, textAlign: 'center',
-    marginTop: spacing.xs, marginBottom: spacing.lg,
-    maxWidth: 300,
+    marginTop: spacing.xs, marginBottom: spacing.lg, maxWidth: 300,
   },
   emptyCta: {
     flexDirection: 'row', alignItems: 'center', gap: 6,

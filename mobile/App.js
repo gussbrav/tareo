@@ -29,8 +29,7 @@ const ICON_NAME = {
   Mas: 'layoutGrid',
 }
 
-function TabIcon({ name, focused, isFab }) {
-  if (isFab) return <FabButton />
+function TabIcon({ name, focused }) {
   return (
     <View style={styles.iconCol}>
       <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
@@ -47,28 +46,37 @@ function TabIcon({ name, focused, isFab }) {
   )
 }
 
-// FAB con spring press feedback (scale + shadow dinámica)
-function FabButton() {
+/**
+ * tabBarButton custom para el tab center — reemplaza al default de
+ * React Navigation para poder incluir el FAB elevado con animación de
+ * scale. Toma onPress del Tab Navigator (ya conectado a la navegación)
+ * y lo dispara al soltar. Ubicar el Pressable ARRIBA de todo evita el
+ * problema anterior donde un Pressable interno robaba el evento y el
+ * "+" no navegaba.
+ */
+function FabTabButton({ onPress, accessibilityState, accessibilityLabel }) {
   const scale = useRef(new Animated.Value(1)).current
   const onIn = () => Animated.spring(scale, {
-    toValue: 0.94, useNativeDriver: true, stiffness: 300, damping: 15, mass: 0.5,
+    toValue: 0.92, useNativeDriver: true, stiffness: 320, damping: 14, mass: 0.5,
   }).start()
   const onOut = () => Animated.spring(scale, {
-    toValue: 1, useNativeDriver: true, stiffness: 300, damping: 15, mass: 0.5,
+    toValue: 1, useNativeDriver: true, stiffness: 320, damping: 14, mass: 0.5,
   }).start()
   return (
-    <Animated.View style={[styles.fab, { transform: [{ scale }] }]}>
-      <Pressable
-        onPressIn={onIn}
-        onPressOut={onOut}
-        // El Pressable no dispara navegación acá — el Tab.Screen ya maneja
-        // el tap. Solo agregamos feedback visual encima.
-        style={styles.fabInner}
-        accessibilityLabel="Nueva actividad"
-      >
+    <Pressable
+      onPress={onPress}
+      onPressIn={onIn}
+      onPressOut={onOut}
+      accessibilityState={accessibilityState}
+      accessibilityLabel={accessibilityLabel || 'Nueva actividad'}
+      accessibilityRole="button"
+      style={styles.fabTabButton}
+      hitSlop={8}
+    >
+      <Animated.View style={[styles.fab, { transform: [{ scale }] }]}>
         <Icon name="plus" size={26} color={colors.text.inverse} strokeWidth={2.25} />
-      </Pressable>
-    </Animated.View>
+      </Animated.View>
+    </Pressable>
   )
 }
 
@@ -117,7 +125,11 @@ function MainTabs() {
             headerTitleStyle: { fontWeight: '700', color: colors.text.primary },
             headerStyle: { backgroundColor: colors.surface },
             headerShadowVisible: false,
-            tabBarIcon: ({ focused }) => <TabIcon name="Nueva" focused={focused} isFab />,
+            // tabBarButton custom en vez de tabBarIcon: garantiza que el
+            // onPress del navigator llegue al FAB (bug anterior: un
+            // Pressable interno robaba el evento).
+            tabBarButton: (props) => <FabTabButton {...props} />,
+            tabBarLabel: () => null,
           }}
         />
       )}
@@ -236,6 +248,11 @@ const styles = StyleSheet.create({
   },
   activeDotHidden: { backgroundColor: 'transparent' },
 
+  fabTabButton: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    // ancho similar a los otros tab items; el FAB "sobresale" arriba
+    // por marginTop negativo del hijo animated.
+  },
   fab: {
     width: 56, height: 56,
     borderRadius: 28,
@@ -243,9 +260,5 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     marginTop: -22,
     ...shadow.floating,
-  },
-  fabInner: {
-    width: '100%', height: '100%', borderRadius: 28,
-    alignItems: 'center', justifyContent: 'center',
   },
 })
