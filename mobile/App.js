@@ -1,8 +1,8 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { useEffect, useState } from 'react'
-import { ActivityIndicator, StyleSheet, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Animated, Pressable, StyleSheet, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import AgendaScreen from './src/screens/AgendaScreen'
@@ -10,6 +10,7 @@ import EditarActividadScreen from './src/screens/EditarActividadScreen'
 import HomeScreen from './src/screens/HomeScreen'
 import LoginScreen from './src/screens/LoginScreen'
 import MasScreen from './src/screens/MasScreen'
+import MiCuentaScreen from './src/screens/MiCuentaScreen'
 import NuevaActividadScreen from './src/screens/NuevaActividadScreen'
 import ReportesScreen from './src/screens/ReportesScreen'
 import TareoScreen from './src/screens/TareoScreen'
@@ -29,22 +30,45 @@ const ICON_NAME = {
 }
 
 function TabIcon({ name, focused, isFab }) {
-  if (isFab) {
-    return (
-      <View style={styles.fab} accessible accessibilityLabel="Nueva actividad">
-        <Icon name="plus" size={26} color={colors.text.inverse} strokeWidth={2.25} />
-      </View>
-    )
-  }
+  if (isFab) return <FabButton />
   return (
-    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-      <Icon
-        name={ICON_NAME[name]}
-        size={22}
-        color={focused ? colors.brand[600] : colors.text.muted}
-        strokeWidth={focused ? 2 : 1.75}
-      />
+    <View style={styles.iconCol}>
+      <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+        <Icon
+          name={ICON_NAME[name]}
+          size={22}
+          color={focused ? colors.brand[600] : colors.text.softMuted}
+          strokeWidth={focused ? 2.25 : 1.75}
+        />
+      </View>
+      {/* Dot indicador debajo del pill activo — patrón iOS/Material 3 */}
+      <View style={[styles.activeDot, !focused && styles.activeDotHidden]} />
     </View>
+  )
+}
+
+// FAB con spring press feedback (scale + shadow dinámica)
+function FabButton() {
+  const scale = useRef(new Animated.Value(1)).current
+  const onIn = () => Animated.spring(scale, {
+    toValue: 0.94, useNativeDriver: true, stiffness: 300, damping: 15, mass: 0.5,
+  }).start()
+  const onOut = () => Animated.spring(scale, {
+    toValue: 1, useNativeDriver: true, stiffness: 300, damping: 15, mass: 0.5,
+  }).start()
+  return (
+    <Animated.View style={[styles.fab, { transform: [{ scale }] }]}>
+      <Pressable
+        onPressIn={onIn}
+        onPressOut={onOut}
+        // El Pressable no dispara navegación acá — el Tab.Screen ya maneja
+        // el tap. Solo agregamos feedback visual encima.
+        style={styles.fabInner}
+        accessibilityLabel="Nueva actividad"
+      >
+        <Icon name="plus" size={26} color={colors.text.inverse} strokeWidth={2.25} />
+      </Pressable>
+    </Animated.View>
   )
 }
 
@@ -58,8 +82,8 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: colors.brand[600],
-        tabBarInactiveTintColor: colors.text.muted,
+        tabBarActiveTintColor: colors.brand[700],
+        tabBarInactiveTintColor: colors.text.softMuted,
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabItem,
         tabBarLabelStyle: styles.tabLabel,
@@ -70,6 +94,7 @@ function MainTabs() {
         component={HomeScreen}
         options={{
           title: 'Inicio',
+          tabBarLabelStyle: styles.tabLabel,
           tabBarIcon: ({ focused }) => <TabIcon name="Home" focused={focused} />,
         }}
       />
@@ -157,6 +182,11 @@ export default function App() {
                 component={ReportesScreen}
                 options={{ title: 'Reportes' }}
               />
+              <Stack.Screen
+                name="MiCuenta"
+                component={MiCuentaScreen}
+                options={{ title: 'Mi cuenta' }}
+              />
             </>
           ) : (
             <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
@@ -169,31 +199,53 @@ export default function App() {
 
 const styles = StyleSheet.create({
   splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand[600] },
+
+  // Tab bar hairline top (más elegante que shadow arriba)
   tabBar: {
     height: 72,
     paddingBottom: 10,
     paddingTop: 8,
     backgroundColor: colors.surface,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
-    ...shadow.tabBar,
+    // sin shadow — la hairline sola da look Apple/Linear
+    elevation: 0,
+    shadowOpacity: 0,
   },
-  tabItem: { paddingVertical: 4 },
-  tabLabel: { ...type.caption, fontSize: 11, fontWeight: '600', marginTop: 3, letterSpacing: 0.1 },
+  tabItem: { paddingVertical: 2 },
+  tabLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+    letterSpacing: 0.1,
+  },
+
+  iconCol: { alignItems: 'center', justifyContent: 'center' },
   iconWrap: {
-    width: 44, height: 30,
+    width: 44, height: 28,
     alignItems: 'center', justifyContent: 'center',
     borderRadius: radius.pill,
   },
   iconWrapActive: {
     backgroundColor: colors.brand[50],
   },
+  activeDot: {
+    width: 4, height: 4, borderRadius: 2,
+    backgroundColor: colors.brand[600],
+    marginTop: 3,
+  },
+  activeDotHidden: { backgroundColor: 'transparent' },
+
   fab: {
-    width: 54, height: 54,
-    borderRadius: 27,
+    width: 56, height: 56,
+    borderRadius: 28,
     backgroundColor: colors.brand[600],
     alignItems: 'center', justifyContent: 'center',
-    marginTop: -20,
+    marginTop: -22,
     ...shadow.floating,
+  },
+  fabInner: {
+    width: '100%', height: '100%', borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
   },
 })

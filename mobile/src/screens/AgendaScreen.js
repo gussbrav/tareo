@@ -1,29 +1,35 @@
 /**
- * AgendaScreen — vista agenda diaria.
- * Header con strip de 7 días (tap para saltar) + navegación semana + Hoy.
- * Debajo: lista de actividades del día seleccionado.
+ * AgendaScreen — vista agrupada por actividad (diferencia real con Tareo).
+ * En Tareo el eje es el trabajador ("¿quién marcó hoy?").
+ * En Agenda el eje es la actividad ("¿qué se hizo hoy?"), agrupando trabajadores.
  *
- * Trabajador ve solo sus actividades; admin/supervisor ven todas.
- * Refresh al focus + polling 20s + pull-to-refresh (paridad CRM Palma).
+ * Header: título + subtítulo con día de semana + botón Hoy.
+ * Strip semanal: 7 pastillas con navegación ‹/› y dot indicador.
+ * Cards: 1 card por descripción única, border-left color-tag pastel
+ *        determinístico (misma actividad → mismo color siempre),
+ *        chip de horas totales, lista de trabajadores expand/collapse.
+ *
+ * Refresh al focus + polling 20 s + pull-to-refresh.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { actividadesApi } from '../api/actividades'
 import { useAuthStore } from '../store/auth'
-import { colors, radius, shadow, spacing, type } from '../theme'
+import { colors, pastelFor, radius, shadow, spacing, type } from '../theme'
 import Icon from '../ui/Icons'
 
 const DIAS_CORTOS = ['D', 'L', 'M', 'X', 'J', 'V', 'S']
@@ -44,11 +50,21 @@ const isoLocal = (d) => {
 const todayIso = () => isoLocal(new Date())
 const fmtHM = (t) => (t ? String(t).slice(0, 5) : '--:--')
 
-/** Devuelve array de 7 fechas (Date) empezando por el Lunes de la semana de `date`. */
+const iniciales = (nombre) => {
+  if (!nombre) return '??'
+  return nombre.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+}
+
+const fmtHoras = (min) => {
+  if (!min || min <= 0) return '—'
+  const h = min / 60
+  return h >= 10 ? `${Math.round(h)}h` : `${h.toFixed(1)}h`
+}
+
 function weekOf(date) {
   const d = new Date(date)
-  const dow = d.getDay() // 0=dom
-  const diff = dow === 0 ? -6 : 1 - dow // shift hacia lunes
+  const dow = d.getDay()
+  const diff = dow === 0 ? -6 : 1 - dow
   const monday = new Date(d)
   monday.setDate(d.getDate() + diff)
   return Array.from({ length: 7 }, (_, i) => {
@@ -57,10 +73,9 @@ function weekOf(date) {
     return day
   })
 }
-
-/** Extrae YYYY-MM del día. */
 const mesOf = (iso) => iso.slice(0, 7)
 
+// ─── Screen ────────────────────────────────────────────────────────────────
 export default function AgendaScreen({ navigation }) {
   const { user } = useAuthStore()
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor'
@@ -70,6 +85,7 @@ export default function AgendaScreen({ navigation }) {
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [expanded, setExpanded] = useState({})
 
   const currentMes = mesOf(selected)
 
@@ -79,7 +95,7 @@ export default function AgendaScreen({ navigation }) {
     try {
       const res = await actividadesApi.listarMes(currentMes)
       setMonthActs(res.actividades || [])
-    } catch (e) {
+    } catch {
       if (!silent) setError('No se pudo cargar la agenda')
     } finally {
       if (!silent) setLoading(false)
@@ -89,13 +105,13 @@ export default function AgendaScreen({ navigation }) {
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
-  // Polling 20s (paridad con web/CRM)
+  // Polling 20 s
   useEffect(() => {
     const id = setInterval(() => load(true), 20_000)
     return () => clearInterval(id)
   }, [load])
 
-  // Índice de actividades por día
+  // Índice por día
   const actsByDay = useMemo(() => {
     const m = {}
     for (const a of monthActs) {
@@ -106,8 +122,35 @@ export default function AgendaScreen({ navigation }) {
     return m
   }, [monthActs])
 
+  // Agrupar el día seleccionado por descripción
+  const gruposDelDia = useMemo(() => {
+    const acts = actsByDay[selected] || []
+    const map = new Map()
+    for (const a of acts) {
+      const key = (a.desactividad || '(Sin descripción)').trim()
+      if (!map.has(key)) {
+        map.set(key, {
+          desc: key,
+          ceco: a.centro_costo_nombre || '',
+          minutosTotal: 0,
+          trabajadores: [],
+        })
+      }
+      const g = map.get(key)
+      g.minutosTotal += Number(a.numduracionminuto) || 0
+      g.trabajadores.push({
+        id: a.id,
+        nombre: a.trabajador_nombre,
+        horinicio: a.horinicio,
+        horfin: a.horfin,
+        minutos: Number(a.numduracionminuto) || 0,
+        iniciado: a.desestadoactividad === 'iniciado',
+      })
+    }
+    return Array.from(map.values()).sort((a, b) => b.minutosTotal - a.minutosTotal)
+  }, [actsByDay, selected])
+
   const week = useMemo(() => weekOf(new Date(selected + 'T12:00:00')), [selected])
-  const selectedActs = actsByDay[selected] || []
   const selDateObj = useMemo(() => new Date(selected + 'T12:00:00'), [selected])
   const dow = DIAS_LARGOS[selDateObj.getDay()]
   const headerLabel = `${dow} ${selDateObj.getDate()} de ${MESES[selDateObj.getMonth()]}`
@@ -119,15 +162,21 @@ export default function AgendaScreen({ navigation }) {
     setSelected(isoLocal(d))
   }
 
+  const toggleGrupo = (key) => {
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const totalActividadesDia = (actsByDay[selected] || []).length
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Header: título + navegación */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Agenda</Text>
           <Text style={styles.subtitle}>{headerLabel}</Text>
         </View>
-        <Pressable style={styles.todayBtn} onPress={goToday}>
+        <Pressable style={styles.todayBtn} onPress={goToday} android_ripple={{ color: colors.brand[500] }}>
           <Text style={styles.todayText}>Hoy</Text>
         </Pressable>
       </View>
@@ -137,11 +186,7 @@ export default function AgendaScreen({ navigation }) {
         <Pressable onPress={() => shiftWeek(-1)} style={styles.arrowBtn} accessibilityLabel="Semana anterior">
           <Icon name="chevronLeft" size={18} color={colors.text.secondary} />
         </Pressable>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.weekStrip}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weekStrip}>
           {week.map((d) => {
             const iso = isoLocal(d)
             const isSel = iso === selected
@@ -150,27 +195,18 @@ export default function AgendaScreen({ navigation }) {
             return (
               <Pressable
                 key={iso}
-                style={[
-                  styles.dayCell,
-                  isSel && styles.dayCellSel,
-                ]}
+                style={[styles.dayCell, isSel && styles.dayCellSel]}
                 onPress={() => setSelected(iso)}
               >
-                <Text style={[styles.dayDow, isSel && styles.dayDowSel]}>
-                  {DIAS_CORTOS[d.getDay()]}
-                </Text>
+                <Text style={[styles.dayDow, isSel && styles.dayDowSel]}>{DIAS_CORTOS[d.getDay()]}</Text>
                 <View style={[styles.dayNumWrap, isToday && !isSel && styles.dayNumWrapToday]}>
                   <Text style={[
                     styles.dayNum,
                     isSel && styles.dayNumSel,
                     isToday && !isSel && styles.dayNumToday,
-                  ]}>
-                    {d.getDate()}
-                  </Text>
+                  ]}>{d.getDate()}</Text>
                 </View>
-                {count > 0 && (
-                  <View style={[styles.dot, isSel && styles.dotSel]} />
-                )}
+                {count > 0 && <View style={[styles.dot, isSel && styles.dotSel]} />}
               </Pressable>
             )
           })}
@@ -186,9 +222,9 @@ export default function AgendaScreen({ navigation }) {
         <ActivityIndicator style={{ marginTop: spacing['3xl'] }} color={colors.brand[600]} />
       ) : (
         <FlatList
-          data={selectedActs}
-          keyExtractor={(it) => it.id}
-          contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing['4xl'] }}
+          data={gruposDelDia}
+          keyExtractor={(g) => g.desc}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -198,9 +234,13 @@ export default function AgendaScreen({ navigation }) {
             />
           }
           ListHeaderComponent={
-            selectedActs.length > 0 ? (
+            gruposDelDia.length > 0 ? (
               <Text style={styles.countLine}>
-                {selectedActs.length} {selectedActs.length === 1 ? 'actividad' : 'actividades'}
+                {gruposDelDia.length}{' '}
+                {gruposDelDia.length === 1 ? 'actividad' : 'actividades'}
+                {' · '}
+                {totalActividadesDia}{' '}
+                {totalActividadesDia === 1 ? 'trabajador' : 'trabajadores'}
               </Text>
             ) : null
           }
@@ -213,44 +253,107 @@ export default function AgendaScreen({ navigation }) {
               <Text style={styles.emptyHint}>Toca otro día en la semana o crea una nueva.</Text>
             </View>
           }
-          renderItem={({ item }) => {
-            const iniciado = item.desestadoactividad === 'iniciado'
-            return (
-              <TouchableOpacity
-                style={styles.card}
-                activeOpacity={0.75}
-                onPress={() => canEdit && navigation.navigate('EditarActividad', { actividadId: item.id })}
-              >
-                <View style={styles.rowBetween}>
-                  <View style={[styles.badge, iniciado ? styles.badgeEmerald : styles.badgeSlate]}>
-                    <View style={[styles.badgeDot, iniciado ? styles.dotEmerald : styles.dotSlate]} />
-                    <Text style={[styles.badgeText, iniciado ? { color: colors.success[700] } : { color: colors.text.secondary }]}>
-                      {item.desestadoactividad}
-                    </Text>
-                  </View>
-                  <Text style={styles.hora}>
-                    {fmtHM(item.horinicio)}{item.horfin ? ` → ${fmtHM(item.horfin)}` : ''}
-                  </Text>
-                </View>
-
-                <Text style={styles.trabajador} numberOfLines={1}>{item.trabajador_nombre}</Text>
-                {item.desactividad ? (
-                  <Text style={styles.desc} numberOfLines={2}>{item.desactividad}</Text>
-                ) : null}
-                {item.centro_costo_nombre ? (
-                  <Text style={styles.meta} numberOfLines={1}>
-                    <Text style={{ color: colors.text.muted }}>CC:</Text> {item.centro_costo_nombre}
-                  </Text>
-                ) : null}
-              </TouchableOpacity>
-            )
-          }}
+          renderItem={({ item }) => (
+            <GrupoActividad
+              grupo={item}
+              expanded={!!expanded[item.desc]}
+              onToggle={() => toggleGrupo(item.desc)}
+              canEdit={canEdit}
+              onEdit={(actividadId) => navigation.navigate('EditarActividad', { actividadId })}
+            />
+          )}
         />
       )}
     </SafeAreaView>
   )
 }
 
+// ─── GrupoActividad card ───────────────────────────────────────────────────
+const MAX_PREVIEW = 5
+
+function GrupoActividad({ grupo, expanded, onToggle, canEdit, onEdit }) {
+  const pastel = pastelFor(grupo.desc)
+  const trabsToShow = expanded ? grupo.trabajadores : grupo.trabajadores.slice(0, MAX_PREVIEW)
+  const remaining = grupo.trabajadores.length - trabsToShow.length
+
+  // rotación del chevron 0 → 180
+  const spin = useRef(new Animated.Value(expanded ? 1 : 0)).current
+  useEffect(() => {
+    Animated.timing(spin, {
+      toValue: expanded ? 1 : 0,
+      duration: 200,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }).start()
+  }, [expanded, spin])
+  const chevronRotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] })
+
+  return (
+    <View style={[styles.card, { borderLeftColor: pastel.fg }]}>
+      <Pressable onPress={onToggle} android_ripple={{ color: colors.surfaceSubtle }}>
+        <View style={styles.cardHeader}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.cardTitle} numberOfLines={2}>{grupo.desc}</Text>
+            <Text style={styles.cardMeta} numberOfLines={1}>
+              {grupo.trabajadores.length}{' '}
+              {grupo.trabajadores.length === 1 ? 'trabajador' : 'trabajadores'}
+              {grupo.ceco ? ` · ${grupo.ceco}` : ''}
+            </Text>
+          </View>
+          <View style={[styles.hoursChip, { backgroundColor: pastel.bg }]}>
+            <Text style={[styles.hoursChipText, { color: pastel.fg }]}>
+              {fmtHoras(grupo.minutosTotal)}
+            </Text>
+          </View>
+          <Animated.View style={{ marginLeft: spacing.sm, transform: [{ rotate: chevronRotate }] }}>
+            <Icon name="chevronDown" size={18} color={colors.text.muted} />
+          </Animated.View>
+        </View>
+      </Pressable>
+
+      {/* Lista de trabajadores */}
+      <View style={styles.divider} />
+      {trabsToShow.map((t, i) => (
+        <Pressable
+          key={t.id}
+          onPress={canEdit ? () => onEdit(t.id) : undefined}
+          android_ripple={canEdit ? { color: colors.surfaceSubtle } : null}
+          style={[styles.trabRow, i > 0 && styles.trabRowBorder]}
+        >
+          <View style={[styles.avatar, { backgroundColor: pastel.bg }]}>
+            <Text style={[styles.avatarText, { color: pastel.fg }]}>{iniciales(t.nombre)}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.trabName} numberOfLines={1}>{t.nombre}</Text>
+            <Text style={styles.trabTime}>
+              {fmtHM(t.horinicio)}{t.horfin ? ` → ${fmtHM(t.horfin)}` : ''}
+            </Text>
+          </View>
+          <View style={styles.trabRight}>
+            {t.iniciado ? (
+              <View style={styles.pillIniciado}>
+                <View style={styles.pillDot} />
+                <Text style={styles.pillIniciadoText}>Activo</Text>
+              </View>
+            ) : (
+              <Text style={styles.trabHoras}>{fmtHoras(t.minutos)}</Text>
+            )}
+          </View>
+        </Pressable>
+      ))}
+
+      {remaining > 0 && !expanded && (
+        <Pressable onPress={onToggle} android_ripple={{ color: colors.surfaceSubtle }} style={styles.moreBtn}>
+          <Text style={[styles.moreBtnText, { color: pastel.fg }]}>
+            + {remaining} {remaining === 1 ? 'trabajador' : 'trabajadores'}
+          </Text>
+        </Pressable>
+      )}
+    </View>
+  )
+}
+
+// ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
 
@@ -260,7 +363,6 @@ const styles = StyleSheet.create({
   },
   title: { ...type.h1, color: colors.text.primary },
   subtitle: { ...type.caption, color: colors.text.tertiary, marginTop: 2, textTransform: 'capitalize' },
-
   todayBtn: {
     paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2,
     borderRadius: radius.pill, backgroundColor: colors.brand[600],
@@ -288,10 +390,7 @@ const styles = StyleSheet.create({
   dayCellSel: { backgroundColor: colors.brand[50] },
   dayDow: { ...type.overline, color: colors.text.muted, fontSize: 10 },
   dayDowSel: { color: colors.brand[600] },
-  dayNumWrap: {
-    width: 28, height: 28, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  dayNumWrap: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   dayNumWrapToday: { backgroundColor: colors.brand[600] },
   dayNum: { fontSize: 14, fontWeight: '600', color: colors.text.primary },
   dayNumSel: { color: colors.brand[700], fontWeight: '700' },
@@ -305,39 +404,68 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, ...type.caption,
   },
 
+  listContent: { padding: spacing.md, paddingBottom: spacing['4xl'] },
   countLine: {
     ...type.caption, color: colors.text.tertiary,
-    paddingHorizontal: spacing.xs, paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.xs, paddingBottom: spacing.md,
   },
 
+  // ── Grupo card
   card: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border,
-    padding: spacing.base, marginBottom: spacing.sm, gap: spacing.xs + 2,
-    ...shadow?.card,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderLeftWidth: 3,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.md,
+    ...shadow.card,
   },
-  rowBetween: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm,
+  cardHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: spacing.base,
+    gap: spacing.md,
   },
-  badge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill,
+  cardTitle: { ...type.bodyStrong, fontSize: 15, color: colors.text.primary, lineHeight: 20 },
+  cardMeta: { ...type.caption, color: colors.text.tertiary, marginTop: 3 },
+  hoursChip: {
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: radius.pill,
   },
-  badgeEmerald: { backgroundColor: colors.success[50] },   // iniciado (activo)
-  badgeSlate:   { backgroundColor: colors.surfaceSubtle }, // finalizado (histórico)
-  badgeDot:     { width: 6, height: 6, borderRadius: 3 },
-  dotEmerald:   { backgroundColor: colors.success[500] },
-  dotSlate:     { backgroundColor: colors.text.muted },
-  badgeText:    { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
-  hora:         { fontSize: 12, color: colors.text.tertiary, fontVariant: ['tabular-nums'] },
+  hoursChipText: { fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  divider: { height: 1, backgroundColor: colors.surfaceSubtle, marginTop: spacing.md },
 
-  trabajador: { ...type.bodyStrong, color: colors.text.primary },
-  desc:       { ...type.body, color: colors.text.secondary },
-  meta:       { ...type.caption, color: colors.text.tertiary },
-
-  empty: {
-    alignItems: 'center', paddingVertical: spacing['3xl'],
+  trabRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    paddingHorizontal: spacing.base, paddingVertical: spacing.sm + 2,
+    minHeight: 44,
   },
+  trabRowBorder: { borderTopWidth: 1, borderTopColor: colors.surfaceSubtle },
+  avatar: {
+    width: 30, height: 30, borderRadius: 15,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  trabName: { ...type.body, fontSize: 14, color: colors.text.primary },
+  trabTime: { ...type.caption, color: colors.text.tertiary, marginTop: 1, fontVariant: ['tabular-nums'] },
+  trabRight: { minWidth: 60, alignItems: 'flex-end' },
+  trabHoras: { fontSize: 13, fontWeight: '600', color: colors.text.primary, fontVariant: ['tabular-nums'] },
+  pillIniciado: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: colors.success[50],
+  },
+  pillDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success[500] },
+  pillIniciadoText: { fontSize: 11, fontWeight: '700', color: colors.success[700] },
+
+  moreBtn: {
+    marginTop: 4, marginHorizontal: spacing.base,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1, borderTopColor: colors.surfaceSubtle,
+    alignItems: 'center',
+  },
+  moreBtnText: { fontSize: 13, fontWeight: '700' },
+
+  empty: { alignItems: 'center', paddingVertical: spacing['3xl'] },
   emptyIcon: {
     width: 48, height: 48, borderRadius: 24,
     alignItems: 'center', justifyContent: 'center',

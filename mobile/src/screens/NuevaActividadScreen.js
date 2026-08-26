@@ -22,6 +22,7 @@ import { actividadesApi, catalogosApi } from '../api/actividades'
 import { colors, radius, shadow, spacing, type } from '../theme'
 import DateField from '../ui/DateField'
 import Icon from '../ui/Icons'
+import PickerField from '../ui/PickerField'
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const today = () => {
@@ -281,34 +282,36 @@ export default function NuevaActividadScreen({ navigation }) {
           </View>
 
           <View style={styles.field}>
-            <Label required>Contrato / Proyecto</Label>
-            <SelectList
+            <PickerField
+              label="Contrato / Proyecto"
+              required
+              value={proyectoId}
               items={proyectos}
               valueKey="id"
               labelKey="descontratoproyecto"
-              selectedId={proyectoId}
-              onSelect={setProyectoId}
-              placeholder="Sin proyectos activos"
-              disabled={proyectos.length === 0}
+              onChange={setProyectoId}
+              placeholder="Elige un proyecto"
+              disabledMessage={proyectos.length === 0 ? 'Sin proyectos activos' : null}
             />
           </View>
 
           <View style={styles.field}>
-            <Label required>Área</Label>
-            <SelectList
+            <PickerField
+              label="Área"
+              required
+              value={areaId}
               items={areas}
               valueKey="id"
               labelKey="display_name"
-              selectedId={areaId}
-              onSelect={setAreaId}
-              placeholder={
+              onChange={setAreaId}
+              placeholder="Elige un área"
+              disabledMessage={
                 !proyectoId
                   ? 'Elige un proyecto primero'
                   : areas.length === 0
                     ? 'Este proyecto no tiene áreas'
-                    : 'Selecciona…'
+                    : null
               }
-              disabled={!proyectoId || areas.length === 0}
             />
             {proyectoId && areas.length === 0 && (
               <Text style={styles.hintWarn}>
@@ -318,28 +321,30 @@ export default function NuevaActividadScreen({ navigation }) {
           </View>
 
           <View style={styles.field}>
-            <Label required>Especialidad</Label>
-            <SelectList
+            <PickerField
+              label="Especialidad"
+              required
+              value={especialidadId}
               items={especialidades}
               valueKey="id"
               labelKey="display_name"
-              selectedId={especialidadId}
-              onSelect={setEspecialidadId}
-              placeholder={areaId ? 'Selecciona…' : 'Elige un área primero'}
-              disabled={!areaId}
+              onChange={setEspecialidadId}
+              placeholder="Elige una especialidad"
+              disabledMessage={!areaId ? 'Elige un área primero' : null}
             />
           </View>
 
           <View style={styles.field}>
-            <Label required>Centro de costo</Label>
-            <SelectList
+            <PickerField
+              label="Centro de costo"
+              required
+              value={centroCostoId}
               items={centrosCosto}
               valueKey="id"
               labelKey="display_name"
-              selectedId={centroCostoId}
-              onSelect={setCentroCostoId}
-              placeholder={especialidadId ? 'Selecciona…' : 'Elige una especialidad primero'}
-              disabled={!especialidadId}
+              onChange={setCentroCostoId}
+              placeholder="Elige un centro de costo"
+              disabledMessage={!especialidadId ? 'Elige una especialidad primero' : null}
             />
           </View>
         </View>

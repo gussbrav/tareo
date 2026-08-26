@@ -17,7 +17,7 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { colors, radius, shadow, spacing, type } from '../theme'
 
-const APP_VERSION = '0.6.0'
+const APP_VERSION = '0.7.0'
 const WEB_BASE =
   Constants.expoConfig?.extra?.apiBaseUrl?.replace(/\/$/, '') ||
   'https://tareo.azoramind.com'
@@ -77,7 +77,7 @@ export default function MasScreen({ navigation }) {
       icon: 'user',
       label: 'Mi cuenta',
       hint: user?.email || 'Datos de tu perfil',
-      onPress: () => Alert.alert('Mi cuenta', 'Sección disponible pronto.'),
+      onPress: () => navigation.navigate('MiCuenta'),
     },
     {
       key: 'ayuda',

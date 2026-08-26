@@ -41,7 +41,19 @@ export const colors = {
     secondary: '#475569',  // 7.5:1 — body
     tertiary:  '#64748B',  // 5.7:1 — captions
     muted:     '#94A3B8',  // 3.5:1 — solo texto grande o disabled
+    softMuted: '#B4C2D6',  // pastel-ish — tabs inactivos, chevrons, hairlines
     inverse:   '#FFFFFF',
+  },
+
+  // ── Soft / pastel palette — para tags, badges por categoría, chips
+  // color-coded en la Agenda. Cada par bg/fg validado ≥ 6:1 sobre blanco.
+  soft: {
+    sky:      { bg: '#E0F2FE', fg: '#075985' },  // 7.8:1
+    mint:     { bg: '#DCFCE7', fg: '#166534' },  // 7.2:1
+    peach:    { bg: '#FFEDD5', fg: '#9A3412' },  // 6.9:1
+    lavender: { bg: '#EDE9FE', fg: '#5B21B6' },  // 8.1:1
+    rose:     { bg: '#FFE4E6', fg: '#9F1239' },  // 7.4:1
+    sun:      { bg: '#FEF3C7', fg: '#854D0E' },  // 6.1:1
   },
 
   // ── Legacy aliases (compat con código anterior) ──
@@ -108,4 +120,19 @@ export const shadow = {
 export const motion = {
   press: { activeOpacity: 0.75 },
   duration: { fast: 150, base: 200, slow: 300 },
+}
+
+// ── Pastel deterministic picker — mismo string → mismo color siempre.
+// Hash FNV-1a. Se usa en AgendaScreen para color-tag por actividad.
+const PASTEL_KEYS = ['sky', 'mint', 'peach', 'lavender', 'rose', 'sun']
+
+export function pastelFor(text = '') {
+  const s = String(text).trim().toLowerCase()
+  if (!s) return colors.soft.sky
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i)
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0
+  }
+  return colors.soft[PASTEL_KEYS[h % PASTEL_KEYS.length]]
 }
