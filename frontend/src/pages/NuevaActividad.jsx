@@ -23,6 +23,7 @@ export default function NuevaActividad() {
   const [fecha, setFecha] = useState(today())
   const [proyectos, setProyectos] = useState([])
   const [areas, setAreas] = useState([])
+  const [loadingAreas, setLoadingAreas] = useState(false)
   const [especialidades, setEspecialidades] = useState([])
   const [centrosCosto, setCentrosCosto] = useState([])
   const [trabajadores, setTrabajadores] = useState([])
@@ -59,9 +60,11 @@ export default function NuevaActividad() {
     setCentrosCosto([])
     setCentroCostoId('')
     if (proyectoId) {
+      setLoadingAreas(true)
       catalogosApi.areas(proyectoId)
         .then(setAreas)
         .catch(() => setError('No se pudieron cargar las áreas del proyecto'))
+        .finally(() => setLoadingAreas(false))
     }
   }, [proyectoId])
 
@@ -201,20 +204,32 @@ export default function NuevaActividad() {
               </select>
             </div>
             <div>
-              <label className="label">Área <Req /></label>
+              <label className="label inline-flex items-center gap-1.5">
+                Área <Req />
+                {/* Tooltip solo cuando ya cargó y no hay áreas — evita el flash
+                    intermitente del banner naranja mientras la API responde. */}
+                {proyectoId && !loadingAreas && areas.length === 0 && (
+                  <InfoTooltip>
+                    Carga las áreas de este proyecto desde <strong>Configuración → Áreas</strong>
+                    {' '}(o impórtalas del Excel).
+                  </InfoTooltip>
+                )}
+              </label>
               <select
                 className="input"
                 value={areaId}
                 onChange={(e) => setAreaId(e.target.value)}
                 required
-                disabled={!proyectoId || areas.length === 0}
+                disabled={!proyectoId || loadingAreas || areas.length === 0}
               >
                 <option value="">
                   {!proyectoId
                     ? 'Elige un proyecto primero'
-                    : areas.length === 0
-                      ? 'Este proyecto no tiene áreas'
-                      : 'Selecciona…'}
+                    : loadingAreas
+                      ? 'Cargando áreas…'
+                      : areas.length === 0
+                        ? 'Este proyecto no tiene áreas'
+                        : 'Selecciona…'}
                 </option>
                 {areas.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -222,12 +237,6 @@ export default function NuevaActividad() {
                   </option>
                 ))}
               </select>
-              {proyectoId && areas.length === 0 && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Carga las áreas de este proyecto desde <strong>Configuración → Áreas</strong>
-                  {' '}(o impórtalas del Excel).
-                </p>
-              )}
             </div>
             <div>
               <label className="label">Especialidad <Req /></label>
@@ -413,4 +422,31 @@ function SectionHeader({ step, title, subtitle }) {
 
 function Req() {
   return <span className="text-red-500">*</span>
+}
+
+/**
+ * Tooltip discreto sobre un ícono ⓘ. Se abre al hover Y al focus (a11y).
+ * Reemplaza el banner naranja que causaba layout shift + intermitencia
+ * durante la carga async del catálogo. Ver comentario en el consumer.
+ */
+function InfoTooltip({ children }) {
+  return (
+    <span className="relative inline-flex items-center group">
+      <button
+        type="button"
+        tabIndex={0}
+        aria-label="Más información"
+        className="text-amber-500 hover:text-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500/40 rounded-full"
+      >
+        <Icon.Info className="w-3.5 h-3.5" />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 bg-slate-900 text-white text-xs font-normal leading-relaxed rounded-md px-3 py-2 shadow-lg z-30"
+      >
+        {children}
+        <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900" />
+      </span>
+    </span>
+  )
 }
