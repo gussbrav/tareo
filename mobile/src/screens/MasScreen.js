@@ -17,7 +17,7 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { colors, radius, shadow, spacing, type } from '../theme'
 
-const APP_VERSION = '0.8.3'
+const APP_VERSION = '0.8.4'
 const WEB_BASE =
   Constants.expoConfig?.extra?.apiBaseUrl?.replace(/\/$/, '') ||
   'https://tareo.azoramind.com'

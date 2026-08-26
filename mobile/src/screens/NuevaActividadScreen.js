@@ -4,7 +4,8 @@
  * asterisco rojo en required, buscador de trabajadores, contador y
  * "Seleccionar todos". Paleta Azoramind (azul brand + neutros).
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import {
   ActivityIndicator,
   Alert,
@@ -156,6 +157,31 @@ export default function NuevaActividadScreen({ navigation }) {
       .catch(() => setTrabajadores([]))
     setSelectedTrabajadores([])
   }, [fecha])
+
+  /**
+   * Reset al enfocar el tab (Tab.Navigator no remonta al cambiar de tab).
+   * Cada vez que el user entra a "Actividad":
+   *   1) Vuelve a hoy (fecha típica de trabajo del día).
+   *   2) Limpia descripción y selección de trabajadores.
+   *   3) Refresca la lista de trabajadores disponibles y activos —
+   *      backend excluye a los que ya tienen actividad iniciada
+   *      ese día + los inactivos (flgativotrabajador + desestado='activo').
+   * NO reseteamos proyecto/área/etc — típicamente el user crea varias
+   * actividades del mismo proyecto seguidas y no queremos forzar 4 taps.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      const t = today()
+      setFecha(t)
+      setDesactividad('')
+      setSelectedTrabajadores([])
+      setSearchWorker('')
+      catalogosApi
+        .trabajadoresDisponibles(t)
+        .then(setTrabajadores)
+        .catch(() => setTrabajadores([]))
+    }, []),
+  )
 
   useEffect(() => {
     setEspecialidades([])
@@ -595,7 +621,9 @@ const styles = StyleSheet.create({
   searchInput: { marginBottom: spacing.sm },
   workersList: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    maxHeight: 320, overflow: 'hidden',
+    // Sin maxHeight — antes había 320px con overflow hidden que ocultaba
+    // trabajadores del final. El ScrollView padre hace el scroll de toda
+    // la pantalla, no hace falta scroll interno anidado.
   },
   workerRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,

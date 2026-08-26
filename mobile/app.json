@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tareo",
     "slug": "azoramind-tareo",
-    "version": "0.8.3",
+    "version": "0.8.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,7 +13,7 @@
     "assetBundlePatterns": ["**/*"],
     "android": {
       "package": "com.azoramind.tareo",
-      "versionCode": 15,
+      "versionCode": 16,
       "adaptiveIcon": {
         "backgroundColor": "#1E40AF"
       },
