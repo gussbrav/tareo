@@ -100,6 +100,8 @@ export default function AdminSettings() {
       setMsg(`"${LABELS[key] || key}" guardado`)
       setTimeout(() => setMsg(''), 2000)
       load()
+      // avisa al header (AppShell) y al login para que refresquen marca al toque
+      window.dispatchEvent(new CustomEvent('tareo:brand-updated'))
     } catch (err) {
       setError(err.response?.data?.detail || 'No se pudo guardar')
     } finally {

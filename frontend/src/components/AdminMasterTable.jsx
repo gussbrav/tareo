@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
 
+import DataTable from './admin/DataTable.jsx'
+import { Icon } from './admin/Icons.jsx'
+import Modal from './admin/Modal.jsx'
+import PageHeader from './admin/PageHeader.jsx'
+import StatusPill from './admin/StatusPill.jsx'
+
 /**
- * Tabla master genérica. Config:
+ * Tabla master genérica.
+ *
+ * Config esperado:
  * - api: { list, create, update, remove }
- * - columns: [{ key, label, format?, sortable? }]
+ * - columns: [{ key, label, sortable?, align?, render? }]
  * - fields: [{ key, label, type: 'text'|'number'|'select'|'checkbox', required?, options?, optionsAsync? }]
- * - title, singular
- * - deleteFlagField: nombre del boolean que se pone false al soft-delete (para color de badge)
+ * - title, singular, countLabel
+ * - searchKeys: keys sobre las que filtra el buscador
+ * - deleteFlagField: nombre del boolean que se pone false al soft-delete
  * - defaults: valores iniciales del form
  */
 export default function AdminMasterTable({
@@ -15,6 +24,8 @@ export default function AdminMasterTable({
   fields,
   title,
   singular,
+  countLabel,
+  searchKeys = [],
   deleteFlagField,
   defaults,
 }) {
@@ -23,6 +34,8 @@ export default function AdminMasterTable({
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(defaults)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
   const [dynOptions, setDynOptions] = useState({})
 
   const load = () => {
@@ -33,7 +46,6 @@ export default function AdminMasterTable({
   useEffect(load, [])
 
   useEffect(() => {
-    // resolver options async (dropdowns que vienen de otro endpoint)
     fields.forEach((f) => {
       if (f.type === 'select' && f.optionsAsync) {
         f.optionsAsync().then((data) => {
@@ -61,14 +73,12 @@ export default function AdminMasterTable({
   const submit = async (e) => {
     e.preventDefault()
     setError('')
-    // Validaciones simples
     for (const f of fields) {
       if (f.required && (form[f.key] == null || form[f.key] === '')) {
         setError(`${f.label} es obligatorio`)
         return
       }
     }
-    // Limpiar strings vacíos en campos opcionales
     const payload = { ...form }
     Object.keys(payload).forEach((k) => {
       if (payload[k] === '' && !fields.find((f) => f.key === k)?.required) {
@@ -76,12 +86,15 @@ export default function AdminMasterTable({
       }
     })
     try {
+      setSaving(true)
       if (editing === 'new') await api.create(payload)
       else await api.update(editing, payload)
       close()
       load()
     } catch (err) {
       setError(err.response?.data?.detail || 'No se pudo guardar')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -93,116 +106,151 @@ export default function AdminMasterTable({
     load()
   }
 
-  const renderCell = (row, col) => {
-    const v = row[col.key]
-    if (col.format) return col.format(v, row)
-    if (v == null) return '—'
-    if (typeof v === 'boolean') return v ? '✓' : '—'
-    return String(v)
+  // Enriquecer columnas: boolean → pill de estado
+  const enrichedColumns = columns.map((c) => {
+    if (c.render) return c
+    if (deleteFlagField && c.key === deleteFlagField) {
+      return {
+        ...c,
+        render: (row) => (
+          row[c.key]
+            ? <StatusPill tone="emerald">activa</StatusPill>
+            : <StatusPill tone="slate">inactiva</StatusPill>
+        ),
+      }
+    }
+    return c
+  })
+
+  const rowActions = (row) => {
+    const inactive = deleteFlagField && row[deleteFlagField] === false
+    return (
+      <>
+        <button
+          className="icon-btn"
+          onClick={() => openEdit(row)}
+          title="Editar"
+          aria-label="Editar"
+        >
+          <Icon.Edit className="w-4 h-4" />
+        </button>
+        {!inactive && (
+          <button
+            className="icon-btn-danger"
+            onClick={() => del(row)}
+            title="Desactivar"
+            aria-label="Desactivar"
+          >
+            <Icon.Archive className="w-4 h-4" />
+          </button>
+        )}
+      </>
+    )
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-slate-500">{items.length} {title.toLowerCase()}</p>
-        <button className="btn-primary" onClick={openNew}>+ Nuevo {singular}</button>
-      </div>
+      <PageHeader
+        title={title}
+        count={items.length}
+        countLabel={countLabel || title.toLowerCase()}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder={`Buscar en ${title.toLowerCase()}…`}
+        primaryLabel={`Nuevo ${singular}`}
+        onPrimary={openNew}
+      />
 
-      {loading ? (
-        <p className="text-slate-500 text-sm">Cargando…</p>
-      ) : (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-slate-500 text-xs uppercase text-left">
-              <tr>
-                {columns.map((c) => <th key={c.key} className="py-2 pr-3">{c.label}</th>)}
-                <th className="py-2 text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {items.map((row) => {
-                const inactive = deleteFlagField && row[deleteFlagField] === false
-                return (
-                  <tr key={row.id} className={inactive ? 'opacity-60' : ''}>
-                    {columns.map((c) => (
-                      <td key={c.key} className="py-2 pr-3 text-slate-800">{renderCell(row, c)}</td>
+      <DataTable
+        items={items}
+        columns={enrichedColumns}
+        loading={loading}
+        search={search}
+        searchKeys={searchKeys}
+        rowActions={rowActions}
+        rowInactive={(row) => deleteFlagField && row[deleteFlagField] === false}
+        empty={{
+          title: `Sin ${countLabel || title.toLowerCase()}`,
+          message: search
+            ? 'No hay resultados para tu búsqueda. Probá con otros términos.'
+            : `Todavía no tenés ${countLabel || title.toLowerCase()} cargados. Creá el primero para empezar.`,
+          actionLabel: search ? undefined : `Nuevo ${singular}`,
+          onAction: search ? undefined : openNew,
+        }}
+      />
+
+      <Modal
+        open={editing !== null}
+        onClose={close}
+        title={editing === 'new' ? `Nuevo ${singular}` : `Editar ${singular}`}
+      >
+        <form onSubmit={submit} className="p-5 space-y-4">
+          {fields.map((f) => {
+            if (f.type === 'checkbox') {
+              return (
+                <label key={f.key} className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={!!form[f.key]}
+                    onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })}
+                    className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/30"
+                  />
+                  {f.label}
+                </label>
+              )
+            }
+            if (f.type === 'select') {
+              return (
+                <div key={f.key}>
+                  <label className="label">{f.label} {f.required && <span className="text-red-500">*</span>}</label>
+                  <select
+                    className="input"
+                    value={form[f.key] || ''}
+                    onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                    required={f.required}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    {optionsFor(f).map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
-                    <td className="py-2 text-right">
-                      <button className="text-brand-600 hover:text-brand-700 text-xs mr-3" onClick={() => openEdit(row)}>Editar</button>
-                      {!inactive && (
-                        <button className="text-red-600 hover:text-red-700 text-xs" onClick={() => del(row)}>Desactivar</button>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-              {items.length === 0 && (
-                <tr><td colSpan={columns.length + 1} className="py-6 text-center text-slate-500">Sin registros</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {editing !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-xl shadow-elevated w-full max-w-md">
-            <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-semibold text-slate-900">
-                {editing === 'new' ? `Nuevo ${singular.toLowerCase()}` : `Editar ${singular.toLowerCase()}`}
-              </h3>
-              <button className="text-slate-400 text-2xl leading-none" onClick={close}>×</button>
-            </div>
-            <form onSubmit={submit} className="p-5 space-y-3">
-              {fields.map((f) => {
-                if (f.type === 'checkbox') {
-                  return (
-                    <label key={f.key} className="flex items-center gap-2 text-sm text-slate-700">
-                      <input type="checkbox" checked={!!form[f.key]}
-                             onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />
-                      {f.label}
-                    </label>
-                  )
-                }
-                if (f.type === 'select') {
-                  return (
-                    <div key={f.key}>
-                      <label className="label">{f.label} {f.required && '*'}</label>
-                      <select className="input" value={form[f.key] || ''}
-                              onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                              required={f.required}>
-                        <option value="">— Seleccionar —</option>
-                        {optionsFor(f).map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )
-                }
-                return (
-                  <div key={f.key}>
-                    <label className="label">{f.label} {f.required && '*'}</label>
-                    <input
-                      type={f.type || 'text'}
-                      className="input"
-                      value={form[f.key] ?? ''}
-                      onChange={(e) => setForm({ ...form, [f.key]: f.type === 'number' ? Number(e.target.value) : e.target.value })}
-                      required={f.required}
-                      placeholder={f.placeholder || ''}
-                    />
-                  </div>
-                )
-              })}
-
-              {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>}
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" className="btn-secondary" onClick={close}>Cancelar</button>
-                <button type="submit" className="btn-primary">Guardar</button>
+                  </select>
+                </div>
+              )
+            }
+            return (
+              <div key={f.key}>
+                <label className="label">{f.label} {f.required && <span className="text-red-500">*</span>}</label>
+                <input
+                  type={f.type || 'text'}
+                  className="input"
+                  value={form[f.key] ?? ''}
+                  onChange={(e) => setForm({
+                    ...form,
+                    [f.key]: f.type === 'number' ? Number(e.target.value) : e.target.value,
+                  })}
+                  required={f.required}
+                  placeholder={f.placeholder || ''}
+                />
               </div>
-            </form>
+            )
+          })}
+
+          {error && (
+            <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <button type="button" className="btn-secondary btn-sm" onClick={close} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn-primary btn-sm" disabled={saving}>
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   )
 }

@@ -12,22 +12,103 @@
   body {
     @apply bg-slate-50 text-slate-800 antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 }
 
 @layer components {
+  /* Buttons -------------------------------------------------------- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium
-           transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium
+           transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none;
   }
-  .btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500; }
-  .btn-secondary { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus:ring-slate-300; }
-  .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500; }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow
+           focus:ring-brand-500/40 active:translate-y-[0.5px];
+  }
+  .btn-secondary {
+    @apply btn border border-slate-200 bg-white text-slate-700 shadow-xs
+           hover:bg-slate-50 hover:border-slate-300 focus:ring-slate-300/60;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white shadow-sm hover:bg-red-700 focus:ring-red-500/40;
+  }
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:ring-slate-300/60;
+  }
+  .btn-sm { @apply px-2.5 py-1.5 text-xs rounded-md gap-1.5; }
 
-  .input {
-    @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm
-           placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
+  /* Icon-only button (para acciones de fila) */
+  .icon-btn {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-md text-slate-500
+           transition-colors hover:bg-slate-100 hover:text-slate-900
+           focus:outline-none focus:ring-2 focus:ring-brand-500/40 disabled:opacity-40;
   }
-  .label { @apply block text-sm font-medium text-slate-700 mb-1; }
-  .card { @apply bg-white rounded-xl shadow-card p-6; }
+  .icon-btn-danger { @apply icon-btn hover:bg-red-50 hover:text-red-700 focus:ring-red-500/30; }
+
+  /* Inputs --------------------------------------------------------- */
+  .input {
+    @apply block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900
+           placeholder:text-slate-400 shadow-xs
+           focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25
+           disabled:bg-slate-50 disabled:text-slate-500;
+  }
+  .input-sm { @apply px-2.5 py-1.5 text-xs rounded-md; }
+  .label { @apply block text-sm font-medium text-slate-700 mb-1.5; }
+
+  /* Cards / surfaces ---------------------------------------------- */
+  .card {
+    @apply bg-white rounded-xl border border-slate-200 shadow-xs p-6;
+  }
+  .card-tight { @apply card p-4; }
+  .card-flush { @apply bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden; }
+
+  /* Status pill (con dot) ----------------------------------------- */
+  .pill {
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium
+           border whitespace-nowrap;
+  }
+  .pill-dot { @apply w-1.5 h-1.5 rounded-full; }
+  .pill-emerald { @apply pill bg-emerald-50 text-emerald-700 border-emerald-200; }
+  .pill-slate   { @apply pill bg-slate-50 text-slate-600 border-slate-200; }
+  .pill-red     { @apply pill bg-red-50 text-red-700 border-red-200; }
+  .pill-brand   { @apply pill bg-brand-50 text-brand-700 border-brand-200; }
+  .pill-amber   { @apply pill bg-amber-50 text-amber-700 border-amber-200; }
+
+  /* Tables --------------------------------------------------------- */
+  .table-premium {
+    @apply w-full text-sm border-separate border-spacing-0;
+  }
+  .table-premium thead th {
+    @apply sticky top-0 z-[1] bg-slate-50/80 backdrop-blur
+           text-[11px] font-semibold uppercase tracking-wider text-slate-500
+           px-4 py-2.5 text-left border-b border-slate-200 select-none;
+  }
+  .table-premium tbody td {
+    @apply px-4 py-3 text-slate-700 border-b border-slate-100 align-middle;
+  }
+  .table-premium tbody tr:last-child td { @apply border-b-0; }
+  .table-premium tbody tr {
+    @apply transition-colors;
+  }
+  .table-premium tbody tr:hover td {
+    @apply bg-slate-50/60;
+  }
+  .table-premium tbody tr.row-inactive td { @apply text-slate-400; }
+
+  /* Sortable header button */
+  .th-sort {
+    @apply inline-flex items-center gap-1 hover:text-slate-700 transition-colors cursor-pointer;
+  }
+
+  /* Toolbar --------------------------------------------------------- */
+  .toolbar {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4;
+  }
+}
+
+@layer utilities {
+  /* xs no lo trae tailwind config; card/elevated sí están en tailwind.config.js */
+  .shadow-xs { box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.05); }
 }
