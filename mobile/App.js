@@ -124,7 +124,9 @@ function MainTabs() {
           name="Nueva"
           component={NuevaActividadScreen}
           options={{
-            title: 'Nueva',
+            // Label del tab: "Actividad" comunica el objeto que se crea.
+            // "Nueva" solo era ambiguo — el trabajador no sabía qué era.
+            title: 'Actividad',
             // Header visible dentro del tab para dar contexto — sin el
             // usuario aterriza en el formulario sin saber dónde está.
             headerShown: true,

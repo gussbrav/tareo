@@ -13,7 +13,12 @@ export const actividadesApi = {
 }
 
 export const catalogosApi = {
-  areas: () => api.get('/api/catalogos/areas').then((r) => r.data),
+  areas: (proyectoId) =>
+    api
+      .get('/api/catalogos/areas', {
+        params: proyectoId ? { proyecto_id: proyectoId } : {},
+      })
+      .then((r) => r.data),
   especialidades: (areaId) =>
     api.get('/api/catalogos/especialidades', { params: { area_id: areaId } }).then((r) => r.data),
   centrosCosto: (especialidadId) =>
