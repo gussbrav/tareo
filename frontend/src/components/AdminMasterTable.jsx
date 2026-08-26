@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { adminApi } from '../api/admin'
 import CecoImporterModal from './admin/CecoImporterModal.jsx'
 import ConfirmDialog from './admin/ConfirmDialog.jsx'
 import DataTable from './admin/DataTable.jsx'
@@ -43,11 +44,38 @@ export default function AdminMasterTable({
   proyectoActivo,
   injectProyectoAs,
   showCecoImporter = false,
+  showCecoExport = false,
   optionsAsyncArgs = [],
   notifyEvent, // opcional: nombre del CustomEvent a disparar tras cualquier mutación (create/update/delete)
 }) {
   const notify = () => {
     if (notifyEvent) window.dispatchEvent(new CustomEvent(notifyEvent))
+  }
+
+  const [exportingSnapshot, setExportingSnapshot] = useState(false)
+  const handleExportSnapshot = async () => {
+    if (!scopeProyectoId) return
+    setExportingSnapshot(true)
+    try {
+      const blob = await adminApi.cecoImporter.downloadSnapshot(scopeProyectoId)
+      const safeName = (proyectoActivo?.descontratoproyecto || proyectoActivo?.nbrproyecto || scopeProyectoId)
+        .toString()
+        .replace(/[^a-z0-9_-]+/gi, '_')
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `cecos_${safeName}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      // Silencioso — el modal de importar tiene handling propio; aquí un
+      // toast sería ideal pero AdminMasterTable no tiene sistema de toast.
+      // El navegador ya loguea el 4xx/5xx en consola.
+    } finally {
+      setExportingSnapshot(false)
+    }
   }
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
@@ -221,8 +249,27 @@ export default function AdminMasterTable({
               />
             </div>
           )}
+          {showCecoExport && scopeProyectoId && (
+            <button
+              className="btn-secondary btn-sm"
+              onClick={handleExportSnapshot}
+              disabled={exportingSnapshot || items.length === 0}
+              title={
+                items.length === 0
+                  ? `Aún no hay ${countLabel || 'ítems'} cargados en este proyecto`
+                  : `Descargar el estado actual de ${proyectoActivo?.descontratoproyecto || proyectoActivo?.nbrproyecto || 'este proyecto'} como Excel (respaldo o edición offline)`
+              }
+            >
+              <Icon.ArrowDown className="w-4 h-4" />
+              {exportingSnapshot ? 'Descargando…' : 'Descargar Excel'}
+            </button>
+          )}
           {showCecoImporter && scopeProyectoId && (
-            <button className="btn-secondary btn-sm" onClick={() => setImporterOpen(true)}>
+            <button
+              className="btn-secondary btn-sm"
+              onClick={() => setImporterOpen(true)}
+              title={`Importar CECOs a ${proyectoActivo?.descontratoproyecto || proyectoActivo?.nbrproyecto || 'este proyecto'} desde Excel`}
+            >
               <Icon.Layers className="w-4 h-4" />
               Importar Excel
             </button>

@@ -39,6 +39,7 @@ const areasConfig = {
   deleteFlagField: 'flgactivoarea',
   injectProyectoAs: 'proyecto_id',
   showCecoImporter: true,
+  showCecoExport: true,
   columns: [
     { key: 'codarea',       label: 'Código', sortable: true },
     { key: 'nbrarea',       label: 'Nombre', sortable: true },
@@ -59,6 +60,7 @@ const especialidadesConfig = {
   countLabel: 'especialidades',
   searchKeys: ['codespecialidad', 'nbrespecialidad', 'area_nombre'],
   deleteFlagField: 'flgactivoespecialidad',
+  showCecoExport: true,
   columns: [
     { key: 'area_nombre',           label: 'Área', sortable: true },
     { key: 'codespecialidad',       label: 'Código', sortable: true },
@@ -94,6 +96,7 @@ const centrosConfig = {
   countLabel: 'centros de costo',
   searchKeys: ['nbrcentrocosto', 'codcentrocosto', 'codigo_ceco', 'especialidad_nombre', 'area_nombre'],
   deleteFlagField: 'flgactivocentrocosto',
+  showCecoExport: true,
   columns: [
     { key: 'area_nombre',          label: 'Área', sortable: true },
     { key: 'especialidad_nombre',  label: 'Especialidad', sortable: true },

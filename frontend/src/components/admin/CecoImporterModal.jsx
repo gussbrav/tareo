@@ -23,47 +23,24 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
-  const [downloadingSnapshot, setDownloadingSnapshot] = useState(false)
-
-  // Helper — dispara la descarga de un Blob como archivo del cliente.
-  const saveBlob = (blob, filename) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
 
   const handleDownloadTemplate = async () => {
     setError('')
     setDownloadingTemplate(true)
     try {
       const blob = await adminApi.cecoImporter.downloadTemplate()
-      saveBlob(blob, 'template_cecos_azoramind.xlsx')
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'template_cecos_azoramind.xlsx'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
     } catch (err) {
       setError('No se pudo descargar el template. Reinténtalo en un momento.')
     } finally {
       setDownloadingTemplate(false)
-    }
-  }
-
-  const handleDownloadSnapshot = async () => {
-    if (!proyecto?.id) return
-    setError('')
-    setDownloadingSnapshot(true)
-    try {
-      const blob = await adminApi.cecoImporter.downloadSnapshot(proyecto.id)
-      const safeName = (proyecto.descontratoproyecto || proyecto.nbrproyecto || proyecto.id)
-        .toString()
-        .replace(/[^a-z0-9_-]+/gi, '_')
-      saveBlob(blob, `cecos_${safeName}.xlsx`)
-    } catch (err) {
-      setError('No se pudo descargar el estado actual. Reinténtalo en un momento.')
-    } finally {
-      setDownloadingSnapshot(false)
     }
   }
 
@@ -151,28 +128,9 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
               </button>
             </div>
 
-            {/* Banner de snapshot — para respaldar/editar la config actual */}
-            <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-md bg-white border border-emerald-200 flex items-center justify-center shrink-0">
-                <Icon.Archive className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800">¿Ya tienes CECOs cargados?</p>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Descarga la configuración actual como Excel para respaldarla o editarla
-                  offline. Cuando la vuelvas a subir, se actualiza sin duplicar.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-secondary btn-sm shrink-0"
-                onClick={handleDownloadSnapshot}
-                disabled={downloadingSnapshot || !proyecto?.id}
-              >
-                <Icon.ArrowDown className="w-4 h-4" />
-                {downloadingSnapshot ? 'Descargando…' : 'Descargar Excel actual'}
-              </button>
-            </div>
+            {/* Nota: la descarga del estado actual vive ahora en el header
+                de Áreas / Especialidades / CC (botón "Descargar Excel"). El
+                modal quedó enfocado únicamente en el flujo de importación. */}
 
             <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
               <Icon.Layers className="w-8 h-8 mx-auto text-slate-400" />
