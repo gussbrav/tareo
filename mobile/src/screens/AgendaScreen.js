@@ -218,9 +218,9 @@ export default function AgendaScreen({ navigation }) {
                 onPress={() => canEdit && navigation.navigate('EditarActividad', { actividadId: item.id })}
               >
                 <View style={styles.rowBetween}>
-                  <View style={[styles.badge, iniciado ? styles.badgeAmber : styles.badgeEmerald]}>
-                    <View style={[styles.badgeDot, iniciado ? styles.dotAmber : styles.dotEmerald]} />
-                    <Text style={[styles.badgeText, iniciado ? { color: colors.warning[700] } : { color: colors.success[700] }]}>
+                  <View style={[styles.badge, iniciado ? styles.badgeEmerald : styles.badgeSlate]}>
+                    <View style={[styles.badgeDot, iniciado ? styles.dotEmerald : styles.dotSlate]} />
+                    <Text style={[styles.badgeText, iniciado ? { color: colors.success[700] } : { color: colors.text.secondary }]}>
                       {item.desestadoactividad}
                     </Text>
                   </View>
@@ -319,11 +319,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill,
   },
-  badgeAmber:   { backgroundColor: colors.warning[50] },
-  badgeEmerald: { backgroundColor: colors.success[50] },
+  badgeEmerald: { backgroundColor: colors.success[50] },   // iniciado (activo)
+  badgeSlate:   { backgroundColor: colors.surfaceSubtle }, // finalizado (histórico)
   badgeDot:     { width: 6, height: 6, borderRadius: 3 },
-  dotAmber:     { backgroundColor: colors.warning[500] },
   dotEmerald:   { backgroundColor: colors.success[500] },
+  dotSlate:     { backgroundColor: colors.text.muted },
   badgeText:    { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
   hora:         { fontSize: 12, color: colors.text.tertiary, fontVariant: ['tabular-nums'] },
 

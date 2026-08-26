@@ -148,8 +148,8 @@ export default function TareoScreen({ navigation }) {
               </View>
               <Text style={styles.desc} numberOfLines={3}>{item.desactividad}</Text>
               <View style={styles.meta}>
-                <View style={[styles.badge, item.desestadoactividad === 'iniciado' ? styles.badgeAmber : styles.badgeEmerald]}>
-                  <Text style={[styles.badgeText, item.desestadoactividad === 'iniciado' ? { color: colors.warning[700] } : { color: colors.success[700] }]}>
+                <View style={[styles.badge, item.desestadoactividad === 'iniciado' ? styles.badgeEmerald : styles.badgeSlate]}>
+                  <Text style={[styles.badgeText, item.desestadoactividad === 'iniciado' ? { color: colors.success[700] } : { color: colors.text.secondary }]}>
                     {item.desestadoactividad}
                   </Text>
                 </View>
@@ -224,8 +224,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.md, gap: spacing.md, flexWrap: 'wrap',
   },
   badge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.sm },
-  badgeAmber: { backgroundColor: colors.warning[100] },
-  badgeEmerald: { backgroundColor: colors.success[100] },
+  badgeAmber:   { backgroundColor: colors.warning[100] }, // legacy, no se usa
+  badgeEmerald: { backgroundColor: colors.success[100] }, // iniciado (activo)
+  badgeSlate:   { backgroundColor: colors.surfaceSubtle }, // finalizado (histórico)
   badgeText: { ...type.overline, letterSpacing: 0.4 },
   hora: { ...type.caption, color: colors.text.tertiary },
   finalize: {

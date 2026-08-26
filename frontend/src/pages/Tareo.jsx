@@ -10,8 +10,11 @@ import EditarActividadModal from '../components/EditarActividadModal.jsx'
 import { Icon } from '../components/admin/Icons.jsx'
 import StatusPill from '../components/admin/StatusPill.jsx'
 
+// Convención de monitoreo (consistente con Agenda):
+//   iniciado  → emerald (activo, en curso — como los indicadores online)
+//   finalizado → slate  (histórico, no requiere atención)
 const stateTone = (estado) =>
-  estado === 'finalizado' ? 'emerald' : estado === 'iniciado' ? 'amber' : 'slate'
+  estado === 'iniciado' ? 'emerald' : estado === 'finalizado' ? 'slate' : 'slate'
 
 function initials(name) {
   if (!name) return '??'
