@@ -94,12 +94,17 @@ def list_for_user(
     q: Optional[str] = None,
     page: int = 1,
     size: int = 50,
+    proyecto_id: Optional[UUID] = None,
 ) -> Dict[str, Any]:
     """Reglas de visibilidad:
 
     - admin: ve todas las actividades del día.
     - supervisor: ve solo las de los proyectos asignados.
     - trabajador: ve solo las suyas (según user.trabajador_id).
+
+    `proyecto_id` (opcional) es un filtro ADICIONAL al scope — usado por el
+    "Proyecto activo" del topbar en la UI. Si el user pidió filtrar por un
+    proyecto al que no tiene acceso, se rechaza con 403.
 
     Devuelve dict paginado {items, total, page, size, pages}.
     """
@@ -112,7 +117,14 @@ def list_for_user(
         scope = get_accessible_proyecto_ids(user)
         if scope is not None and not scope:
             return {"items": [], "total": 0, "page": page, "size": size, "pages": 0}
-        items, total = repo.list_by_date(fecha, q=q, page=page, size=size, proyecto_ids=scope)
+        # Si viene proyecto_id explícito, verificamos que el user tenga acceso.
+        if proyecto_id:
+            assert_can_access_proyecto(user, proyecto_id)
+        items, total = repo.list_by_date(
+            fecha, q=q, page=page, size=size,
+            proyecto_ids=scope,
+            proyecto_id_filter=proyecto_id,
+        )
     pages = (total + size - 1) // size if total else 0
     return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
 

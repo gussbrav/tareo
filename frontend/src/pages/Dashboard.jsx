@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 
 import { reportesApi } from '../api/reportes'
 import { useAuthStore } from '../store/auth'
+import { useActiveProjectStore } from '../store/project'
 import { today } from '../lib/format'
 import DateField from '../components/admin/DateField.jsx'
 import { Icon } from '../components/admin/Icons.jsx'
@@ -184,6 +185,8 @@ function filtroReducer(state, action) {
 export default function Dashboard() {
   const { user } = useAuthStore()
   const canExport = user?.role === 'admin' || user?.role === 'supervisor'
+  // "Proyecto activo" del topbar — override del filtro dimensional.
+  const activeProjectId = useActiveProjectStore((s) => s.activeProjectId)
 
   const [filtro, dispatch] = useReducer(filtroReducer, INIT)
   const [data, setData] = useState(null)
@@ -192,11 +195,15 @@ export default function Dashboard() {
   const [exporting, setExporting] = useState(false)
   const [presetActivo, setPresetActivo] = useState(3) // "30 días" por defecto
 
+  // proyecto_id efectivo: si el topbar tiene uno seteado, gana; sino, el
+  // que el user elija en el filtro local del dashboard.
+  const proyectoIdEff = activeProjectId || filtro.proyecto_id
+
   const load = useCallback(() => {
     setLoading(true)
     setError('')
     const params = {}
-    if (filtro.proyecto_id) params.proyecto_id = filtro.proyecto_id
+    if (proyectoIdEff) params.proyecto_id = proyectoIdEff
     if (filtro.area_id) params.area_id = filtro.area_id
     if (filtro.categoria_id) params.categoria_id = filtro.categoria_id
     reportesApi
@@ -204,7 +211,7 @@ export default function Dashboard() {
       .then(setData)
       .catch(() => setError('No se pudieron cargar los datos. Verifica la conexión.'))
       .finally(() => setLoading(false))
-  }, [filtro])
+  }, [filtro, proyectoIdEff])
 
   // Debounce: espera 400ms tras cambios en filtro para no disparar en cada tecla
   const debounceRef = useRef(null)
@@ -224,7 +231,7 @@ export default function Dashboard() {
     setExporting(true)
     try {
       const params = {}
-      if (filtro.proyecto_id) params.proyecto_id = filtro.proyecto_id
+      if (proyectoIdEff) params.proyecto_id = proyectoIdEff
       if (filtro.area_id) params.area_id = filtro.area_id
       if (filtro.categoria_id) params.categoria_id = filtro.categoria_id
       await reportesApi.descargarExcel(filtro.desde, filtro.hasta, params)

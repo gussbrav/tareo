@@ -5,10 +5,14 @@ export const actividadesApi = {
   /**
    * Lista paginada de actividades del día.
    * Devuelve { items, total, page, size, pages }.
+   *
+   * `proyectoId` es filtro opcional (viene del "Proyecto activo" del topbar)
+   * — se agrega al scope del user, no lo reemplaza.
    */
-  listar: (fecha, { q = '', page = 1, size = 50 } = {}) => {
+  listar: (fecha, { q = '', page = 1, size = 50, proyectoId = null } = {}) => {
     const params = { fecha, page, size }
     if (q && q.trim()) params.q = q.trim()
+    if (proyectoId) params.proyecto_id = proyectoId
     return api.get('/api/actividades', { params }).then((r) => r.data)
   },
   listarMes: (mes, filtros = {}) =>

@@ -21,6 +21,7 @@ import EditarActividadModal from '../components/EditarActividadModal.jsx'
 import { Icon } from '../components/admin/Icons.jsx'
 import StatusPill from '../components/admin/StatusPill.jsx'
 import { useAuthStore } from '../store/auth'
+import { useActiveProjectStore } from '../store/project'
 import { fmtHM } from '../lib/format'
 
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
@@ -677,6 +678,9 @@ export default function Agenda() {
   const { user } = useAuthStore()
   const canManage = user?.role === 'admin' || user?.role === 'supervisor'
 
+  // Filtro global "Proyecto activo" del topbar — actúa como override.
+  const activeProjectId = useActiveProjectStore((s) => s.activeProjectId)
+
   const today = getLocalToday()
   const [view, setView] = useState('mes')
   const [groupBy, setGroupBy] = useState('trabajador')
@@ -711,7 +715,10 @@ export default function Agenda() {
     setError('')
     const filtros = {}
     if (filterTrabajador) filtros.trabajador_id = filterTrabajador
-    if (filterProyecto) filtros.proyecto_id = filterProyecto
+    // activeProjectId (topbar) tiene prioridad sobre filterProyecto (interno):
+    // el "proyecto activo" es la fuente de verdad global.
+    const proyIdEff = activeProjectId || filterProyecto
+    if (proyIdEff) filtros.proyecto_id = proyIdEff
     actividadesApi.listarMes(mes, filtros)
       .then((res) => setActividades(res.actividades || []))
       .catch((err) => {
@@ -725,7 +732,7 @@ export default function Agenda() {
         if (!silent) setLoading(false)
         fetchedRef.current = true
       })
-  }, [mes, filterTrabajador, filterProyecto])
+  }, [mes, filterTrabajador, filterProyecto, activeProjectId])
 
   useEffect(() => { fetchActividades() }, [fetchActividades])
 

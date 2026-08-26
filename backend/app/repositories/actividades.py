@@ -112,23 +112,30 @@ def list_by_date(
     page: int = 1,
     size: int = 50,
     proyecto_ids: Optional[List[str]] = None,
+    proyecto_id_filter: Optional[Any] = None,
 ) -> tuple[List[Dict[str, Any]], int]:
     """Actividades del día paginadas + total.
 
-    `proyecto_ids`:
+    `proyecto_ids` (scope de acceso del user):
       - None  → sin filtro (admin bypass)
       - [...] → WHERE proyecto_id = ANY(...)
       - []    → el caller lo maneja antes; aquí igual damos WHERE FALSE
 
-    Ejecuta 2 queries (COUNT + SELECT) con el mismo WHERE. Índices sobre
-    fecactividad y proyecto_id hacen esto barato incluso con miles de filas.
+    `proyecto_id_filter` (filtro adicional del "Proyecto activo" en UI):
+      - None → no filtra
+      - UUID → WHERE proyecto_id = %s (además del scope)
+
+    Índices sobre fecactividad y proyecto_id hacen esto barato con miles.
     """
     search_sql, search_params = _search_clause(q)
     scope_sql = ""
     scope_params: List[Any] = []
     if proyecto_ids is not None:
-        scope_sql = " AND a.proyecto_id = ANY(%s::uuid[])"
-        scope_params = [proyecto_ids]
+        scope_sql += " AND a.proyecto_id = ANY(%s::uuid[])"
+        scope_params.append(proyecto_ids)
+    if proyecto_id_filter:
+        scope_sql += " AND a.proyecto_id = %s::uuid"
+        scope_params.append(str(proyecto_id_filter))
     offset = max(page - 1, 0) * size
 
     with get_db() as conn, conn.cursor() as cur:

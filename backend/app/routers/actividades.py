@@ -30,9 +30,10 @@ def listar(
     q: str | None = Query(default=None, max_length=200, description="Búsqueda por trabajador, actividad, estado o CC"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=50, ge=1, le=200),
+    proyecto_id: UUID | None = Query(default=None, description="Filtro adicional al scope: solo actividades de este proyecto"),
     user: UserPublic = Depends(get_current_user),
 ):
-    return svc.list_for_user(fecha, user, q=q, page=page, size=size)
+    return svc.list_for_user(fecha, user, q=q, page=page, size=size, proyecto_id=proyecto_id)
 
 
 @router.get("/mes")

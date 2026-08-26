@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { actividadesApi } from '../api/actividades'
 import { today, fmtHM, minutosToHoras } from '../lib/format'
 import { useAuthStore } from '../store/auth'
+import { useActiveProjectStore } from '../store/project'
 import ConfirmDialog from '../components/admin/ConfirmDialog.jsx'
 import DateField from '../components/admin/DateField.jsx'
 import EditarActividadModal from '../components/EditarActividadModal.jsx'
@@ -50,6 +51,10 @@ export default function Tareo() {
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor'
   const canDelete = user?.role === 'admin'
 
+  // Filtro global "Proyecto activo" del topbar — si está seteado, el listado
+  // se limita a ese proyecto. Cambia en tiempo real cuando el user elige otro.
+  const activeProjectId = useActiveProjectStore((s) => s.activeProjectId)
+
   const [fecha, setFecha] = useState(today())
   const [items, setItems] = useState([])
   const [total, setTotal] = useState(0)
@@ -77,17 +82,17 @@ export default function Tareo() {
     return () => clearTimeout(debounceRef.current)
   }, [filter])
 
-  // Al cambiar de fecha, resetear a página 1 (sin esto quedarías en página N
-  // inexistente de otra fecha).
+  // Al cambiar de fecha O de proyecto activo, resetear a página 1 (sin esto
+  // quedarías en página N inexistente del nuevo dataset).
   useEffect(() => {
     setPage(1)
-  }, [fecha])
+  }, [fecha, activeProjectId])
 
   const load = () => {
     setLoading(true)
     setError('')
     actividadesApi
-      .listar(fecha, { q: qDebounced, page, size: PAGE_SIZE })
+      .listar(fecha, { q: qDebounced, page, size: PAGE_SIZE, proyectoId: activeProjectId })
       .then((data) => {
         setItems(data.items || [])
         setTotal(data.total || 0)
@@ -97,7 +102,7 @@ export default function Tareo() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(load, [fecha, qDebounced, page])
+  useEffect(load, [fecha, qDebounced, page, activeProjectId])
 
   // Selección "seleccionar todas las iniciadas" opera sobre la página visible.
   // Cross-page selection persiste en `selected` (Set de IDs) al navegar.
