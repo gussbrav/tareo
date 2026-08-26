@@ -55,14 +55,18 @@ export default function Tareo() {
   useEffect(load, [fecha])
 
   const filtered = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    if (!q) return items
-    return items.filter(
-      (a) =>
-        (a.trabajador_nombre || '').toLowerCase().includes(q) ||
-        (a.desactividad || '').toLowerCase().includes(q) ||
-        (a.detalle_resumido || '').toLowerCase().includes(q),
-    )
+    const tokens = filter.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    if (tokens.length === 0) return items
+    return items.filter((a) => {
+      const haystack = [
+        a.trabajador_nombre,
+        a.desactividad,
+        a.detalle_resumido,
+        a.desestadoactividad,
+        a.centro_costo_nombre,
+      ].map((s) => (s || '').toLowerCase()).join(' | ')
+      return tokens.every((t) => haystack.includes(t))
+    })
   }, [items, filter])
 
   const finalizableIds = useMemo(
@@ -222,7 +226,7 @@ export default function Tareo() {
               <Icon.Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 className="input pl-8"
-                placeholder="Buscar por trabajador, descripción o estado…"
+                placeholder="Buscar por trabajador, actividad, estado o CC…"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
               />
