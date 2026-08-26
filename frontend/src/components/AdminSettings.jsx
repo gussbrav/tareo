@@ -10,7 +10,7 @@ import { configApi } from '../api/config'
 const GROUPS = [
   {
     title: 'Marca — visual',
-    keys: ['logo_url', 'brand_primary_color', 'brand_accent_color'],
+    keys: ['logo_url', 'favicon_url', 'brand_primary_color', 'brand_accent_color'],
   },
   {
     title: 'Empresa',
@@ -27,7 +27,8 @@ const GROUPS = [
 ]
 
 const LABELS = {
-  logo_url: 'Logo',
+  logo_url: 'Logo de la empresa',
+  favicon_url: 'Favicon (icono de pestaña)',
   brand_primary_color: 'Color primario',
   brand_accent_color: 'Color de acento',
   company_name: 'Nombre de la empresa',
@@ -39,8 +40,10 @@ const LABELS = {
   app_environment_label: 'Etiqueta del ambiente',
 }
 
+// Copy detallado estilo CRM Azoramind: tamaños recomendados, formatos y peso.
 const HINTS = {
-  logo_url: 'Aparece en el header y en el login. Se recomienda PNG con fondo transparente, máx. 500 KB.',
+  logo_url: 'Aparece en el header del sistema, la pantalla de login y en los reportes Excel. Tamaño recomendado: 256×256 px (cuadrado). Formatos: PNG, JPG o SVG. Fondo transparente recomendado.',
+  favicon_url: 'Ícono que aparece en la pestaña del navegador. Tamaño recomendado: 32×32 o 64×64 px (cuadrado). Formatos: ICO, PNG o SVG.',
   brand_primary_color: 'Botones, header, acentos principales.',
   brand_accent_color: 'Detalles, hover states, badges destacados.',
   company_name: 'Aparece en el header del Excel y en el login',
@@ -51,7 +54,23 @@ const HINTS = {
   app_environment_label: 'Ej. producción, staging, demo',
 }
 
-const MAX_LOGO_BYTES = 500 * 1024 // 500 KB
+// Config por-campo para el ImageField (reusable entre logo y favicon).
+const IMAGE_FIELDS = {
+  logo_url: {
+    maxBytes: 500 * 1024, // 500 KB
+    accept: 'image/png,image/jpeg,image/svg+xml,image/webp',
+    acceptLabel: 'PNG, JPG, SVG o WEBP — hasta 500 KB',
+    previewClass: 'w-20 h-20 rounded-md',
+    uploadLabel: 'Subir logo',
+  },
+  favicon_url: {
+    maxBytes: 100 * 1024, // 100 KB
+    accept: 'image/x-icon,image/vnd.microsoft.icon,image/png,image/svg+xml',
+    acceptLabel: 'ICO, PNG o SVG — hasta 100 KB',
+    previewClass: 'w-14 h-14 rounded-md',
+    uploadLabel: 'Subir favicon',
+  },
+}
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -140,8 +159,9 @@ export default function AdminSettings() {
                     <div className="text-xs text-slate-400 mt-0.5">{HINTS[key] || ''}</div>
                   </div>
                   <div className="sm:col-span-2 flex gap-2">
-                    {key === 'logo_url' ? (
-                      <LogoField
+                    {IMAGE_FIELDS[key] ? (
+                      <ImageField
+                        config={IMAGE_FIELDS[key]}
                         value={valueOf(key)}
                         onChange={(v) => setValue(key, v)}
                         onError={setError}
@@ -174,19 +194,22 @@ export default function AdminSettings() {
   )
 }
 
-function LogoField({ value, onChange, onError }) {
+function ImageField({ config, value, onChange, onError }) {
   const inputRef = useRef(null)
+  const { maxBytes, accept, acceptLabel, previewClass, uploadLabel } = config
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > MAX_LOGO_BYTES) {
-      onError(`El logo pesa ${(file.size / 1024).toFixed(0)} KB. Máximo permitido: 500 KB.`)
+    if (file.size > maxBytes) {
+      const kb = (file.size / 1024).toFixed(0)
+      const maxKb = Math.round(maxBytes / 1024)
+      onError(`El archivo pesa ${kb} KB. Máximo permitido: ${maxKb} KB.`)
       e.target.value = ''
       return
     }
-    if (!file.type.startsWith('image/')) {
-      onError('El archivo debe ser una imagen (PNG, JPG, SVG).')
+    if (!file.type.startsWith('image/') && !file.name.endsWith('.ico')) {
+      onError(`El archivo debe ser una imagen (${acceptLabel}).`)
       e.target.value = ''
       return
     }
@@ -203,11 +226,11 @@ function LogoField({ value, onChange, onError }) {
   return (
     <div className="flex-1 flex flex-col gap-2">
       <div className="flex items-center gap-3">
-        <div className="w-20 h-20 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
+        <div className={`${previewClass} border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0`}>
           {value ? (
-            <img src={value} alt="Logo" className="max-w-full max-h-full object-contain" />
+            <img src={value} alt="preview" className="max-w-full max-h-full object-contain" />
           ) : (
-            <span className="text-[10px] text-slate-400">sin logo</span>
+            <span className="text-[10px] text-slate-400">sin imagen</span>
           )}
         </div>
         <div className="flex flex-col gap-1">
@@ -216,7 +239,7 @@ function LogoField({ value, onChange, onError }) {
             className="btn-secondary text-xs"
             onClick={() => inputRef.current?.click()}
           >
-            {value ? 'Cambiar imagen' : 'Subir imagen'}
+            {value ? 'Cambiar imagen' : uploadLabel}
           </button>
           {value && (
             <button
@@ -232,7 +255,7 @@ function LogoField({ value, onChange, onError }) {
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg,image/svg+xml"
+        accept={accept}
         className="hidden"
         onChange={handleFile}
       />

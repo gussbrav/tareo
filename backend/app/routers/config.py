@@ -33,7 +33,7 @@ def public_settings() -> Dict[str, str]:
             SELECT key, value FROM public.system_settings
              WHERE key IN (
                'company_name', 'company_taxid', 'app_environment_label',
-               'logo_url', 'brand_primary_color', 'brand_accent_color'
+               'logo_url', 'favicon_url', 'brand_primary_color', 'brand_accent_color'
              );
             """
         )

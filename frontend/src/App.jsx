@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import Login from './pages/Login.jsx'
@@ -8,8 +9,20 @@ import Tareo from './pages/Tareo.jsx'
 import Admin from './pages/Admin.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import AppShell from './components/AppShell.jsx'
+import { configApi } from './api/config'
+import { applyBrand } from './lib/brand'
 
 export default function App() {
+  // Bootstrap: cargamos la marca pública (favicon + title) UNA vez al iniciar
+  // la app. Sirve para el Login (sin auth) y queda cacheado para AppShell.
+  // Se refresca cuando el admin edita Marca (evento tareo:brand-updated).
+  useEffect(() => {
+    const load = () => configApi.publicSettings().then(applyBrand).catch(() => {})
+    load()
+    window.addEventListener('tareo:brand-updated', load)
+    return () => window.removeEventListener('tareo:brand-updated', load)
+  }, [])
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
