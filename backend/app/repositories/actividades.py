@@ -111,17 +111,28 @@ def list_by_date(
     q: Optional[str] = None,
     page: int = 1,
     size: int = 50,
+    proyecto_ids: Optional[List[str]] = None,
 ) -> tuple[List[Dict[str, Any]], int]:
-    """Actividades del día paginadas + total (para calcular páginas).
+    """Actividades del día paginadas + total.
 
-    Ejecuta 2 queries (COUNT + SELECT) con el mismo WHERE. Con índice sobre
-    fecactividad esto es barato incluso con miles de filas por día.
+    `proyecto_ids`:
+      - None  → sin filtro (admin bypass)
+      - [...] → WHERE proyecto_id = ANY(...)
+      - []    → el caller lo maneja antes; aquí igual damos WHERE FALSE
+
+    Ejecuta 2 queries (COUNT + SELECT) con el mismo WHERE. Índices sobre
+    fecactividad y proyecto_id hacen esto barato incluso con miles de filas.
     """
     search_sql, search_params = _search_clause(q)
+    scope_sql = ""
+    scope_params: List[Any] = []
+    if proyecto_ids is not None:
+        scope_sql = " AND a.proyecto_id = ANY(%s::uuid[])"
+        scope_params = [proyecto_ids]
     offset = max(page - 1, 0) * size
 
     with get_db() as conn, conn.cursor() as cur:
-        # 1. Total (mismo WHERE, sin LIMIT/OFFSET)
+        # 1. Total (mismo WHERE)
         cur.execute(
             f"""
             SELECT COUNT(*) AS n
@@ -129,9 +140,10 @@ def list_by_date(
               JOIN construccion.m_trabajador t ON t.id = a.trabajador_id
               LEFT JOIN construccion.m_centrocosto cc ON cc.id = a.centro_costo_id
              WHERE a.fecactividad = %s
+             {scope_sql}
              {search_sql};
             """,
-            (fecha, *search_params),
+            (fecha, *scope_params, *search_params),
         )
         total = int(cur.fetchone()["n"])
 
@@ -162,11 +174,12 @@ def list_by_date(
               LEFT JOIN construccion.m_centrocosto cc ON cc.id = a.centro_costo_id
               LEFT JOIN construccion.m_proyecto p ON p.id = a.proyecto_id
              WHERE a.fecactividad = %s
+             {scope_sql}
              {search_sql}
              ORDER BY a.created_at DESC
              LIMIT %s OFFSET %s;
             """,
-            (fecha, *search_params, size, offset),
+            (fecha, *scope_params, *search_params, size, offset),
         )
         items = [dict(r) for r in cur.fetchall()]
     return items, total
@@ -177,9 +190,10 @@ def list_by_month(
     month: int,
     trabajador_id: Optional[UUID] = None,
     proyecto_id: Optional[UUID] = None,
+    proyecto_ids_scope: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
-    """Actividades de un mes completo, para vista agenda.
-    Payload mínimo (pensado para renderizar pills de calendario)."""
+    """Actividades del mes para vista agenda. Aplica scope por proyectos
+    accesibles (`proyecto_ids_scope`) además del filtro específico opcional."""
     where = ["EXTRACT(YEAR FROM a.fecactividad) = %s", "EXTRACT(MONTH FROM a.fecactividad) = %s"]
     params: List[Any] = [year, month]
     if trabajador_id:
@@ -188,6 +202,9 @@ def list_by_month(
     if proyecto_id:
         where.append("a.proyecto_id = %s")
         params.append(str(proyecto_id))
+    if proyecto_ids_scope is not None:
+        where.append("a.proyecto_id = ANY(%s::uuid[])")
+        params.append(proyecto_ids_scope)
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(
             f"""

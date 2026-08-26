@@ -51,7 +51,12 @@ def list_trabajadores():
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            SELECT t.*, c.nbrcategoria AS categoria_nombre
+            SELECT t.*,
+                   c.nbrcategoria AS categoria_nombre,
+                   COALESCE(
+                     (SELECT COUNT(*) FROM construccion.trabajador_proyecto
+                       WHERE trabajador_id = t.id), 0
+                   )::int AS proyectos_count
               FROM construccion.m_trabajador t
               LEFT JOIN construccion.m_categoria_trabajador c ON c.id = t.categoria_id
              ORDER BY t.nbrcompleto;
@@ -121,6 +126,59 @@ def delete_trabajador(trabajador_id: UUID):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Trabajador no encontrado")
 
 
+# ── Asignación trabajador ↔ proyectos (M:N) ─────────────────────────────
+
+class ProyectoIdsPayload(BaseModel):
+    proyecto_ids: List[UUID] = Field(default_factory=list)
+
+
+@router.get("/trabajadores/{trabajador_id}/proyectos")
+def get_trabajador_proyectos(trabajador_id: UUID):
+    """Devuelve los IDs de proyectos a los que está asignado el trabajador."""
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT proyecto_id FROM construccion.trabajador_proyecto"
+            " WHERE trabajador_id = %s;",
+            (str(trabajador_id),),
+        )
+        return {"proyecto_ids": [str(r["proyecto_id"]) for r in cur.fetchall()]}
+
+
+@router.put("/trabajadores/{trabajador_id}/proyectos")
+def set_trabajador_proyectos(trabajador_id: UUID, payload: ProyectoIdsPayload):
+    """Reemplaza el set completo de proyectos del trabajador (idempotente).
+    UI manda todos los IDs seleccionados; el backend hace diff (DELETE los
+    que sobran + INSERT los nuevos) en una sola transacción."""
+    ids = [str(pid) for pid in payload.proyecto_ids]
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM construccion.m_trabajador WHERE id = %s;",
+            (str(trabajador_id),),
+        )
+        if not cur.fetchone():
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Trabajador no encontrado")
+        # DELETE los que ya no están
+        if ids:
+            cur.execute(
+                "DELETE FROM construccion.trabajador_proyecto"
+                " WHERE trabajador_id = %s AND proyecto_id <> ALL(%s::uuid[]);",
+                (str(trabajador_id), ids),
+            )
+        else:
+            cur.execute(
+                "DELETE FROM construccion.trabajador_proyecto WHERE trabajador_id = %s;",
+                (str(trabajador_id),),
+            )
+        # INSERT los nuevos (ON CONFLICT DO NOTHING para idempotencia)
+        for pid in ids:
+            cur.execute(
+                "INSERT INTO construccion.trabajador_proyecto (trabajador_id, proyecto_id)"
+                " VALUES (%s, %s) ON CONFLICT DO NOTHING;",
+                (str(trabajador_id), pid),
+            )
+    return {"proyecto_ids": ids}
+
+
 # ============================================================
 # Usuarios
 # ============================================================
@@ -151,7 +209,11 @@ def list_users():
             """
             SELECT u.id, u.email, u.first_name, u.last_name, u.role,
                    u.trabajador_id, u.is_active, u.created_at, u.last_login_at,
-                   t.nbrcompleto AS trabajador_nombre
+                   t.nbrcompleto AS trabajador_nombre,
+                   COALESCE(
+                     (SELECT COUNT(*) FROM auth.user_proyecto
+                       WHERE user_id = u.id), 0
+                   )::int AS proyectos_count
               FROM auth.users u
               LEFT JOIN construccion.m_trabajador t ON t.id = u.trabajador_id
              ORDER BY u.email;
@@ -221,6 +283,57 @@ def delete_user(user_id: UUID):
         cur.execute("UPDATE auth.users SET is_active = false WHERE id = %s;", (str(user_id),))
         if cur.rowcount == 0:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Usuario no encontrado")
+
+
+# ── Asignación usuario ↔ proyectos (M:N) ────────────────────────────────
+# Admin: acceso a todos los proyectos (bypass a nivel aplicación — no se le
+# asignan filas explícitamente). Supervisor/trabajador: ve solo los proyectos
+# asignados aquí.
+
+
+@router.get("/usuarios/{user_id}/proyectos")
+def get_user_proyectos(user_id: UUID):
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT proyecto_id FROM auth.user_proyecto WHERE user_id = %s;",
+            (str(user_id),),
+        )
+        return {"proyecto_ids": [str(r["proyecto_id"]) for r in cur.fetchall()]}
+
+
+@router.put("/usuarios/{user_id}/proyectos")
+def set_user_proyectos(user_id: UUID, payload: ProyectoIdsPayload):
+    """Reemplaza el set completo de proyectos del usuario. Mismo patrón
+    diff (DELETE + INSERT ON CONFLICT DO NOTHING) que trabajadores."""
+    ids = [str(pid) for pid in payload.proyecto_ids]
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT role FROM auth.users WHERE id = %s;", (str(user_id),))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Usuario no encontrado")
+        # Admin no necesita asignaciones — su rol le da acceso a todo.
+        if row["role"] == "admin" and ids:
+            # No hacemos hard-fail; simplemente ignoramos y devolvemos vacío
+            # para no complicar la UI. El bypass real está en el enforcement.
+            ids = []
+        if ids:
+            cur.execute(
+                "DELETE FROM auth.user_proyecto"
+                " WHERE user_id = %s AND proyecto_id <> ALL(%s::uuid[]);",
+                (str(user_id), ids),
+            )
+        else:
+            cur.execute(
+                "DELETE FROM auth.user_proyecto WHERE user_id = %s;",
+                (str(user_id),),
+            )
+        for pid in ids:
+            cur.execute(
+                "INSERT INTO auth.user_proyecto (user_id, proyecto_id)"
+                " VALUES (%s, %s) ON CONFLICT DO NOTHING;",
+                (str(user_id), pid),
+            )
+    return {"proyecto_ids": ids}
 
 
 # ============================================================

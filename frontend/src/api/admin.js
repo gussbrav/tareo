@@ -21,9 +21,18 @@ const uploadFile = (url, file) => {
   return api.post(url, fd, { headers: { 'Content-Type': 'multipart/form-data' } }).then((r) => r.data)
 }
 
+// Scoping por proyecto (M:N) — a qué proyectos pertenece un trabajador/usuario.
+const scopingApi = (resourcePath) => ({
+  getProyectos: (id) =>
+    api.get(`/api/admin/${resourcePath}/${id}/proyectos`).then((r) => r.data),
+  setProyectos: (id, proyectoIds) =>
+    api.put(`/api/admin/${resourcePath}/${id}/proyectos`, { proyecto_ids: proyectoIds })
+      .then((r) => r.data),
+})
+
 export const adminApi = {
-  trabajadores: resource('trabajadores'),
-  usuarios: resource('usuarios'),
+  trabajadores: { ...resource('trabajadores'), scoping: scopingApi('trabajadores') },
+  usuarios: { ...resource('usuarios'), scoping: scopingApi('usuarios') },
   areas: resource('areas', { reorderable: true, scopable: true }),
   especialidades: resource('especialidades', { reorderable: true, scopable: true }),
   centrosCosto: resource('centros-costo', { reorderable: true, scopable: true }),

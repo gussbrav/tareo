@@ -126,11 +126,15 @@ def dashboard_completo(
     proyecto_id: Optional[UUID] = None,
     area_id: Optional[UUID] = None,
     categoria_id: Optional[UUID] = None,
+    proyecto_ids_scope: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Agrega en una sola conexión todos los datos del dashboard v2:
     KPIs del período + período anterior comparable, tendencia diaria,
     top trabajadores, distribución por categoría, por CC, y alertas.
+
+    `proyecto_ids_scope`: si viene, filtra por a.proyecto_id IN (...) — usado
+    para scoping por usuario (admin bypass = None).
     """
     dias = max((hasta - desde).days, 1)
     from datetime import timedelta
@@ -140,6 +144,9 @@ def dashboard_completo(
     # Filtros dimensionales opcionales
     filtros_base = []
     params_filtros = []
+    if proyecto_ids_scope is not None:
+        filtros_base.append("a.proyecto_id = ANY(%s::uuid[])")
+        params_filtros.append(proyecto_ids_scope)
     if proyecto_id:
         filtros_base.append("a.proyecto_id = %s")
         params_filtros.append(str(proyecto_id))
@@ -323,18 +330,33 @@ def dashboard_completo(
         cur.execute(q_alertas, params_filtros if params_filtros else [])
         alertas = [dict(r) for r in cur.fetchall()]
 
-        # ── 9. Catálogos para filtros dimensionales ────────────────────────
-        cur.execute(
-            "SELECT id::text, descontratoproyecto AS nombre FROM construccion.m_proyecto"
-            " WHERE flgactivoproyecto = true ORDER BY descontratoproyecto;"
-        )
-        proyectos = [dict(r) for r in cur.fetchall()]
-
-        cur.execute(
-            "SELECT id::text, nbrarea AS nombre FROM construccion.m_area"
-            " WHERE flgactivoarea = true ORDER BY nbrarea;"
-        )
-        areas = [dict(r) for r in cur.fetchall()]
+        # ── 9. Catálogos para filtros dimensionales (respetando scope) ─────
+        if proyecto_ids_scope is None:
+            cur.execute(
+                "SELECT id::text, descontratoproyecto AS nombre FROM construccion.m_proyecto"
+                " WHERE flgactivoproyecto = true ORDER BY descontratoproyecto;"
+            )
+            proyectos = [dict(r) for r in cur.fetchall()]
+            cur.execute(
+                "SELECT id::text, nbrarea AS nombre FROM construccion.m_area"
+                " WHERE flgactivoarea = true ORDER BY nbrarea;"
+            )
+            areas = [dict(r) for r in cur.fetchall()]
+        else:
+            cur.execute(
+                "SELECT id::text, descontratoproyecto AS nombre FROM construccion.m_proyecto"
+                " WHERE flgactivoproyecto = true AND id = ANY(%s::uuid[])"
+                " ORDER BY descontratoproyecto;",
+                (proyecto_ids_scope,),
+            )
+            proyectos = [dict(r) for r in cur.fetchall()]
+            cur.execute(
+                "SELECT id::text, nbrarea AS nombre FROM construccion.m_area"
+                " WHERE flgactivoarea = true AND proyecto_id = ANY(%s::uuid[])"
+                " ORDER BY nbrarea;",
+                (proyecto_ids_scope,),
+            )
+            areas = [dict(r) for r in cur.fetchall()]
 
         cur.execute(
             "SELECT id::text, nbrcategoria AS nombre FROM construccion.m_categoria_trabajador"

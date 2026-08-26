@@ -71,10 +71,18 @@ export default function NuevaActividad() {
     }
   }, [proyectoId])
 
+  // Los trabajadores dependen del proyecto (scoping) Y de la fecha (ocupación).
+  // Sin proyecto no hay a quién listar → lista vacía y aviso via UI.
   useEffect(() => {
-    catalogosApi.trabajadoresDisponibles(fecha).then(setTrabajadores).catch(() => setTrabajadores([]))
     setSelectedTrabajadores(new Set())
-  }, [fecha])
+    if (!proyectoId || !fecha) {
+      setTrabajadores([])
+      return
+    }
+    catalogosApi.trabajadoresDisponibles(fecha, proyectoId)
+      .then(setTrabajadores)
+      .catch(() => setTrabajadores([]))
+  }, [fecha, proyectoId])
 
   useEffect(() => {
     setEspecialidades([])
@@ -161,7 +169,7 @@ export default function NuevaActividad() {
       setOk(`Se crearon ${res.created} actividad(es).`)
       setDesactividad('')
       setSelectedTrabajadores(new Set())
-      const nuevos = await catalogosApi.trabajadoresDisponibles(fecha)
+      const nuevos = await catalogosApi.trabajadoresDisponibles(fecha, proyectoId)
       setTrabajadores(nuevos)
     } catch (err) {
       setError(err.response?.data?.detail || 'No se pudo crear la actividad')

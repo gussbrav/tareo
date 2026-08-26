@@ -63,24 +63,41 @@ def list_centros_costo(especialidad_id: UUID) -> List[dict]:
         return [dict(r) for r in cur.fetchall()]
 
 
-def list_proyectos() -> List[dict]:
+def list_proyectos(proyecto_ids: Optional[List[str]] = None) -> List[dict]:
+    """Proyectos activos. Si `proyecto_ids` es una lista, filtra por ese set
+    (scoping por usuario). None = sin filtro (admin bypass)."""
+    if proyecto_ids is not None and not proyecto_ids:
+        return []  # user sin proyectos asignados → lista vacía
     with get_db() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT id, codproyecto, nbrproyecto, descontratoproyecto
-              FROM construccion.m_proyecto
-             WHERE flgactivoproyecto = true
-             ORDER BY codproyecto;
-            """
-        )
+        if proyecto_ids is None:
+            cur.execute(
+                """
+                SELECT id, codproyecto, nbrproyecto, descontratoproyecto
+                  FROM construccion.m_proyecto
+                 WHERE flgactivoproyecto = true
+                 ORDER BY codproyecto;
+                """
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, codproyecto, nbrproyecto, descontratoproyecto
+                  FROM construccion.m_proyecto
+                 WHERE flgactivoproyecto = true
+                   AND id = ANY(%s::uuid[])
+                 ORDER BY codproyecto;
+                """,
+                (proyecto_ids,),
+            )
         return [dict(r) for r in cur.fetchall()]
 
 
-def list_trabajadores_disponibles(fecha: date) -> List[dict]:
-    """Trabajadores activos que NO tengan actividad 'iniciado' esa fecha.
+def list_trabajadores_disponibles(fecha: date, proyecto_id: UUID) -> List[dict]:
+    """Trabajadores del PROYECTO activos que NO tengan actividad 'iniciado' esa fecha.
 
-    Replica la regla del original: un trabajador no puede estar en 2
-    actividades iniciadas al mismo día — evita doble-conteo de horas.
+    Aplica scoping por proyecto (V014): solo devuelve trabajadores asignados
+    al proyecto vía construccion.trabajador_proyecto. Cambio breaking:
+    proyecto_id ahora es obligatorio — el frontend fue actualizado.
     """
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(
@@ -91,6 +108,9 @@ def list_trabajadores_disponibles(fecha: date) -> List[dict]:
                    t.descategoriatrabajador,
                    CONCAT(t.nbrcompleto, ' - ', COALESCE(t.descategoriatrabajador, '')) AS display_name
               FROM construccion.m_trabajador t
+              JOIN construccion.trabajador_proyecto tp
+                     ON tp.trabajador_id = t.id
+                    AND tp.proyecto_id = %s
               LEFT JOIN construccion.m_actividad a
                      ON a.trabajador_id = t.id
                     AND a.fecactividad = %s
@@ -100,8 +120,65 @@ def list_trabajadores_disponibles(fecha: date) -> List[dict]:
                AND a.trabajador_id IS NULL
              ORDER BY t.nbrcompleto;
             """,
-            (fecha,),
+            (str(proyecto_id), fecha),
         )
+        return [dict(r) for r in cur.fetchall()]
+
+
+def list_trabajadores_disponibles_union(
+    fecha: date,
+    proyecto_ids: Optional[List[str]] = None,
+) -> List[dict]:
+    """Unión de trabajadores libres esa fecha en los proyectos accesibles.
+    Fallback para clientes que no envían proyecto_id (mobile viejo, admin).
+
+    - proyecto_ids=None (admin bypass): TODOS los trabajadores activos libres.
+    - proyecto_ids=[...]: DISTINCT de trabajadores en esos proyectos.
+    """
+    with get_db() as conn, conn.cursor() as cur:
+        if proyecto_ids is None:
+            cur.execute(
+                """
+                SELECT t.id,
+                       t.nbrcompleto,
+                       t.numidentificacion,
+                       t.descategoriatrabajador,
+                       CONCAT(t.nbrcompleto, ' - ', COALESCE(t.descategoriatrabajador, '')) AS display_name
+                  FROM construccion.m_trabajador t
+                  LEFT JOIN construccion.m_actividad a
+                         ON a.trabajador_id = t.id
+                        AND a.fecactividad = %s
+                        AND a.desestadoactividad = 'iniciado'
+                 WHERE t.flgativotrabajador = true
+                   AND lower(t.desestadotrabajador) = 'activo'
+                   AND a.trabajador_id IS NULL
+                 ORDER BY t.nbrcompleto;
+                """,
+                (fecha,),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT DISTINCT t.id,
+                       t.nbrcompleto,
+                       t.numidentificacion,
+                       t.descategoriatrabajador,
+                       CONCAT(t.nbrcompleto, ' - ', COALESCE(t.descategoriatrabajador, '')) AS display_name
+                  FROM construccion.m_trabajador t
+                  JOIN construccion.trabajador_proyecto tp
+                         ON tp.trabajador_id = t.id
+                        AND tp.proyecto_id = ANY(%s::uuid[])
+                  LEFT JOIN construccion.m_actividad a
+                         ON a.trabajador_id = t.id
+                        AND a.fecactividad = %s
+                        AND a.desestadoactividad = 'iniciado'
+                 WHERE t.flgativotrabajador = true
+                   AND lower(t.desestadotrabajador) = 'activo'
+                   AND a.trabajador_id IS NULL
+                 ORDER BY t.nbrcompleto;
+                """,
+                (proyecto_ids, fecha),
+            )
         return [dict(r) for r in cur.fetchall()]
 
 

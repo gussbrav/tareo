@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { adminApi } from '../api/admin'
+import AsignarProyectosModal from './admin/AsignarProyectosModal.jsx'
 import ConfirmDialog from './admin/ConfirmDialog.jsx'
 import DataTable from './admin/DataTable.jsx'
 import { Icon } from './admin/Icons.jsx'
@@ -30,6 +31,7 @@ export default function AdminUsuarios() {
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(null)
+  const [assigningProyectos, setAssigningProyectos] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -121,6 +123,43 @@ export default function AdminUsuarios() {
       render: (u) => u.trabajador_nombre
         ? <span className="text-slate-600 text-sm">{u.trabajador_nombre}</span>
         : <span className="text-slate-400">—</span>,
+    },
+    {
+      key: 'proyectos_count',
+      label: 'Proyectos',
+      align: 'center',
+      sortable: true,
+      render: (u) => {
+        // Admin: acceso a todo por rol, no requiere asignaciones explícitas.
+        if (u.role === 'admin') {
+          return (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700"
+              title="Admin: acceso a todos los proyectos por su rol"
+            >
+              <Icon.Shield className="w-3 h-3" />
+              Todos
+            </span>
+          )
+        }
+        const n = u.proyectos_count || 0
+        const tone = n === 0
+          ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+          : 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+        return (
+          <button
+            type="button"
+            onClick={() => setAssigningProyectos(u)}
+            title={n === 0
+              ? 'Sin proyectos asignados — el usuario no verá ningún proyecto'
+              : 'Editar proyectos asignados'}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium tabular-nums transition-colors ${tone}`}
+          >
+            <Icon.Folder className="w-3 h-3" />
+            {n === 0 ? 'Sin proyectos' : `${n} ${n === 1 ? 'proyecto' : 'proyectos'}`}
+          </button>
+        )
+      },
     },
     {
       key: 'is_active',
@@ -275,6 +314,17 @@ export default function AdminUsuarios() {
           </>
         }
         confirmLabel="Desactivar"
+      />
+
+      <AsignarProyectosModal
+        open={!!assigningProyectos}
+        onClose={() => setAssigningProyectos(null)}
+        scopingApi={adminApi.usuarios.scoping}
+        entityId={assigningProyectos?.id}
+        entityLabel={assigningProyectos?.email}
+        disabled={assigningProyectos?.role === 'admin'}
+        disabledHelp="Los admins tienen acceso a todos los proyectos por su rol — no requieren asignación."
+        onSaved={load}
       />
     </div>
   )

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { adminApi } from '../api/admin'
+import AsignarProyectosModal from './admin/AsignarProyectosModal.jsx'
 import ConfirmDialog from './admin/ConfirmDialog.jsx'
 import DataTable from './admin/DataTable.jsx'
 import { Icon } from './admin/Icons.jsx'
@@ -41,6 +42,7 @@ export default function AdminTrabajadores() {
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [confirmingDelete, setConfirmingDelete] = useState(null)
+  const [assigningProyectos, setAssigningProyectos] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -130,6 +132,29 @@ export default function AdminTrabajadores() {
           {row.desestadotrabajador || 'sin estado'}
         </StatusPill>
       ),
+    },
+    {
+      key: 'proyectos_count',
+      label: 'Proyectos',
+      align: 'center',
+      sortable: true,
+      render: (row) => {
+        const n = row.proyectos_count || 0
+        const tone = n === 0
+          ? 'bg-slate-100 text-slate-500'
+          : 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+        return (
+          <button
+            type="button"
+            onClick={() => setAssigningProyectos(row)}
+            title="Asignar proyectos"
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium tabular-nums transition-colors ${tone}`}
+          >
+            <Icon.Folder className="w-3 h-3" />
+            {n === 0 ? 'Sin proyectos' : `${n} ${n === 1 ? 'proyecto' : 'proyectos'}`}
+          </button>
+        )
+      },
     },
     {
       key: 'flgativotrabajador',
@@ -262,6 +287,15 @@ export default function AdminTrabajadores() {
           </>
         }
         confirmLabel="Desactivar"
+      />
+
+      <AsignarProyectosModal
+        open={!!assigningProyectos}
+        onClose={() => setAssigningProyectos(null)}
+        scopingApi={adminApi.trabajadores.scoping}
+        entityId={assigningProyectos?.id}
+        entityLabel={assigningProyectos?.nbrcompleto}
+        onSaved={load}
       />
     </div>
   )

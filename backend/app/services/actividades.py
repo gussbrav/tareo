@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from psycopg2.errors import UniqueViolation
 
 from app.auth.schemas import UserPublic
+from app.auth.scoping import assert_can_access_proyecto, get_accessible_proyecto_ids
 from app.repositories import actividades as repo
 from app.schemas.actividades import (
     ActividadCreateBulk,
@@ -34,6 +35,7 @@ def create_bulk(payload: ActividadCreateBulk, user: UserPublic) -> Dict[str, Any
     Reglas:
     - Solo admin y supervisor pueden crear actividades (los trabajadores
       ven las suyas pero no crean).
+    - El proyecto debe estar entre los accesibles por el user (admin bypass).
     - Un trabajador NO puede tener dos actividades 'iniciado' el mismo día.
       Se valida antes con find_trabajadores_con_iniciada (mensaje amigable);
       además la DB tiene UNIQUE INDEX parcial como safety net contra race
@@ -44,6 +46,9 @@ def create_bulk(payload: ActividadCreateBulk, user: UserPublic) -> Dict[str, Any
 
     if not payload.trabajador_ids:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Selecciona al menos un trabajador")
+
+    # Scoping: verificar que el supervisor tenga acceso al proyecto destino.
+    assert_can_access_proyecto(user, payload.proyecto_id)
 
     # Dedup: por si el frontend manda el mismo id dos veces.
     unique_ids = list({tid for tid in payload.trabajador_ids})
@@ -92,19 +97,22 @@ def list_for_user(
 ) -> Dict[str, Any]:
     """Reglas de visibilidad:
 
-    - admin y supervisor: ven todas las actividades del día.
+    - admin: ve todas las actividades del día.
+    - supervisor: ve solo las de los proyectos asignados.
     - trabajador: ve solo las suyas (según user.trabajador_id).
 
-    Devuelve dict paginado {items, total, page, size, pages} — forma consistente
-    para cualquier rol (permite un mismo cliente sin ramas por role).
+    Devuelve dict paginado {items, total, page, size, pages}.
     """
     if user.role == "trabajador":
         if not user.trabajador_id:
-            # Trabajador sin trabajador_id linkeado: no ve nada. Evita filtrar por None.
             return {"items": [], "total": 0, "page": page, "size": size, "pages": 0}
         items, total = repo.list_by_trabajador(user.trabajador_id, fecha, q=q, page=page, size=size)
     else:
-        items, total = repo.list_by_date(fecha, q=q, page=page, size=size)
+        # admin: scope = None (sin filtro). supervisor: scope = lista de proyectos.
+        scope = get_accessible_proyecto_ids(user)
+        if scope is not None and not scope:
+            return {"items": [], "total": 0, "page": page, "size": size, "pages": 0}
+        items, total = repo.list_by_date(fecha, q=q, page=page, size=size, proyecto_ids=scope)
     pages = (total + size - 1) // size if total else 0
     return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
 
@@ -116,8 +124,8 @@ def list_month_for_user(
     trabajador_id: Optional[UUID] = None,
     proyecto_id: Optional[UUID] = None,
 ) -> Dict[str, Any]:
-    """Vista agenda: todas las actividades del mes con filtros opcionales.
-    Trabajador siempre ve sólo las suyas (ignora filtro trabajador_id)."""
+    """Vista agenda: actividades del mes con filtros opcionales + scope.
+    Trabajador ve sólo las suyas. Supervisor ve solo las de sus proyectos."""
     if user.role == "trabajador":
         if not user.trabajador_id:
             return {"actividades": []}
@@ -127,10 +135,18 @@ def list_month_for_user(
             proyecto_id=proyecto_id,
         )
     else:
+        # Scope por proyectos accesibles (admin bypass = None).
+        scope = get_accessible_proyecto_ids(user)
+        if scope is not None and not scope:
+            return {"actividades": []}
+        # Si el user pidió un proyecto específico, verificar que tenga acceso.
+        if proyecto_id and scope is not None and str(proyecto_id) not in scope:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "No tienes acceso a este proyecto")
         actividades = repo.list_by_month(
             year=year, month=month,
             trabajador_id=trabajador_id,
             proyecto_id=proyecto_id,
+            proyecto_ids_scope=scope,
         )
     return {"actividades": actividades}
 

@@ -12,6 +12,7 @@ from openpyxl.utils import get_column_letter
 
 from app.auth.dependencies import get_current_user, require_role
 from app.auth.schemas import UserPublic
+from app.auth.scoping import get_accessible_proyecto_ids
 from app.config import get_settings
 from app.database import get_db
 from app.repositories import reportes as repo
@@ -49,21 +50,32 @@ def dashboard(
     proyecto_id: Optional[UUID] = Query(default=None),
     area_id: Optional[UUID] = Query(default=None),
     categoria_id: Optional[UUID] = Query(default=None),
-    _: UserPublic = Depends(get_current_user),
+    user: UserPublic = Depends(get_current_user),
 ):
     """Payload completo para el Dashboard v2.
 
+    Aplica scoping por proyectos accesibles al user (admin bypass = None).
     Un solo round-trip con KPIs + delta período anterior + tendencia diaria
     + top trabajadores + por categoría + por CC + heatmap + alertas + catálogos.
     """
     d, h = _default_range()
     d = desde or d
     h = hasta or h
+    scope = get_accessible_proyecto_ids(user)
+    if scope is not None and not scope:
+        return {
+            "kpis": {}, "kpis_prev": {}, "tendencia": [],
+            "top_trabajadores": [], "por_categoria": [], "por_cc": [],
+            "heatmap": [], "alertas": [],
+            "catalogos": {"proyectos": [], "areas": [], "categorias": []},
+            "rango": {"desde": d.isoformat(), "hasta": h.isoformat()},
+        }
     payload = repo.dashboard_completo(
         d, h,
         proyecto_id=proyecto_id,
         area_id=area_id,
         categoria_id=categoria_id,
+        proyecto_ids_scope=scope,
     )
     payload["rango"] = {"desde": d.isoformat(), "hasta": h.isoformat()}
     return payload
@@ -94,14 +106,12 @@ def _fmt_hm(m: int) -> str:
     return f"{h}:{mm:02d}"
 
 
-@router.get(
-    "/actividades.xlsx",
-    dependencies=[Depends(require_role("admin", "supervisor"))],
-)
+@router.get("/actividades.xlsx")
 def export_excel(
     desde: date | None = Query(default=None),
     hasta: date | None = Query(default=None),
     trabajador_id: Optional[UUID] = Query(default=None, description="Opcional: filtra un solo trabajador"),
+    user: UserPublic = Depends(require_role("admin", "supervisor")),
 ) -> StreamingResponse:
     """Reporte "Registro de Control de Asistencia" (formato Grecia neutro).
 
@@ -118,31 +128,38 @@ def export_excel(
     d = desde or d
     h = hasta or h
 
-    # Query — reusamos repo pero necesitamos también refrigerio y DNI del trabajador.
-    filtro_extra = ""
-    params: list = [d, h]
-    if trabajador_id:
-        filtro_extra = " AND a.trabajador_id = %s"
-        params.append(str(trabajador_id))
+    # Scoping por proyecto (admin ve todo; supervisor solo sus proyectos)
+    scope = get_accessible_proyecto_ids(user)
+    if scope is not None and not scope:
+        rows = []
+    else:
+        filtro_extra = ""
+        params: list = [d, h]
+        if trabajador_id:
+            filtro_extra += " AND a.trabajador_id = %s"
+            params.append(str(trabajador_id))
+        if scope is not None:
+            filtro_extra += " AND a.proyecto_id = ANY(%s::uuid[])"
+            params.append(scope)
 
-    sql = f"""
-        SELECT a.fecactividad,
-               t.nbrcompleto        AS apellidos_nombres,
-               COALESCE(t.numidentificacion, '') AS dni,
-               a.horinicio::time    AS horario_ingreso,
-               a.horiniciorefrigerio::time AS refrig_inicio,
-               a.horfinrefrigerio::time    AS refrig_fin,
-               a.horfin::time       AS horario_salida,
-               a.desestadoactividad AS estado,
-               COALESCE(a.desobservaciones, '') AS observaciones
-          FROM construccion.m_actividad a
-          JOIN construccion.m_trabajador t ON t.id = a.trabajador_id
-         WHERE a.fecactividad BETWEEN %s AND %s{filtro_extra}
-         ORDER BY a.fecactividad, t.nbrcompleto;
-    """
-    with get_db() as conn, conn.cursor() as cur:
-        cur.execute(sql, tuple(params))
-        rows = [dict(r) for r in cur.fetchall()]
+        sql = f"""
+            SELECT a.fecactividad,
+                   t.nbrcompleto        AS apellidos_nombres,
+                   COALESCE(t.numidentificacion, '') AS dni,
+                   a.horinicio::time    AS horario_ingreso,
+                   a.horiniciorefrigerio::time AS refrig_inicio,
+                   a.horfinrefrigerio::time    AS refrig_fin,
+                   a.horfin::time       AS horario_salida,
+                   a.desestadoactividad AS estado,
+                   COALESCE(a.desobservaciones, '') AS observaciones
+              FROM construccion.m_actividad a
+              JOIN construccion.m_trabajador t ON t.id = a.trabajador_id
+             WHERE a.fecactividad BETWEEN %s AND %s{filtro_extra}
+             ORDER BY a.fecactividad, t.nbrcompleto;
+        """
+        with get_db() as conn, conn.cursor() as cur:
+            cur.execute(sql, tuple(params))
+            rows = [dict(r) for r in cur.fetchall()]
 
     # --- Excel ---
     wb = Workbook()
