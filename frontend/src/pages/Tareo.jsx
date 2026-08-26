@@ -12,6 +12,20 @@ import StatusPill from '../components/admin/StatusPill.jsx'
 
 const PAGE_SIZE = 50
 
+/** "2026-08-25" → "lun, 25 ago 2026" (Lima local, sin drift UTC). */
+function fmtFecha(iso) {
+  if (!iso) return ''
+  try {
+    const [y, m, d] = iso.split('-').map(Number)
+    const dt = new Date(y, m - 1, d)
+    return dt
+      .toLocaleDateString('es-PE', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+      .replace('.', '') // "lun." → "lun"
+  } catch {
+    return iso
+  }
+}
+
 // Convención de monitoreo (consistente con Agenda):
 //   iniciado  → emerald (activo, en curso — como los indicadores online)
 //   finalizado → slate  (histórico, no requiere atención)
@@ -222,11 +236,22 @@ export default function Tareo() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Registro de tareo</h1>
-        <p className="text-slate-500 text-sm mt-1">
-          {total} {total === 1 ? 'actividad' : 'actividades'} · {fecha}
-        </p>
+      {/* Header con paginador arriba a la derecha, look Gmail */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Registro de tareo</h1>
+          <p className="text-slate-500 text-sm mt-1 capitalize">{fmtFecha(fecha)}</p>
+        </div>
+        {total > 0 && (
+          <Paginator
+            page={page}
+            pages={pages}
+            total={total}
+            size={PAGE_SIZE}
+            onPageChange={setPage}
+            disabled={loading}
+          />
+        )}
       </div>
 
       {/* Filtros */}
@@ -377,17 +402,6 @@ export default function Tareo() {
             )
           })}
         </ul>
-      )}
-
-      {total > 0 && (
-        <Paginator
-          page={page}
-          pages={pages}
-          total={total}
-          size={PAGE_SIZE}
-          onPageChange={setPage}
-          disabled={loading}
-        />
       )}
 
       {editing && (
