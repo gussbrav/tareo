@@ -12,17 +12,11 @@ import { Icon } from './Icons.jsx'
  * - hover row
  * - empty state
  * - acciones por fila (rowActions)
+ * - drag & drop opcional (onReorder) — deshabilitado si hay orden por columna activo
+ *   o si hay búsqueda (para evitar arrastrar sobre un subset filtrado)
  *
- * Props:
- *   items         : array de filas
- *   columns       : [{ key, label, sortable?, render?, className?, align? }]
- *   rowKey        : (row) => string  (default: row.id)
- *   loading       : bool
- *   search        : string
- *   searchKeys    : array de keys sobre las que filtra
- *   rowActions    : (row) => ReactNode
- *   rowInactive   : (row) => bool  (aplica opacidad)
- *   empty         : props para EmptyState { title, message, actionLabel, onAction }
+ * Props extra:
+ *   onReorder(newItems)  — si se pasa, activa drag&drop en las filas
  */
 export default function DataTable({
   items = [],
@@ -34,8 +28,11 @@ export default function DataTable({
   rowActions,
   rowInactive,
   empty = {},
+  onReorder,
 }) {
   const [sort, setSort] = useState({ key: null, dir: 'asc' })
+  const [dragId, setDragId] = useState(null)
+  const [overId, setOverId] = useState(null)
 
   const filtered = useMemo(() => {
     if (!search) return items
@@ -62,6 +59,10 @@ export default function DataTable({
     })
   }, [filtered, sort, columns])
 
+  // Drag&drop está activo sólo cuando: no hay orden por columna, no hay búsqueda,
+  // y el parent pasa onReorder. Reordenar sobre un subset filtrado sería confuso.
+  const dragEnabled = !!onReorder && !sort.key && !search
+
   const toggleSort = (key) => {
     setSort((s) =>
       s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' },
@@ -73,6 +74,34 @@ export default function DataTable({
     return sort.dir === 'asc'
       ? <Icon.ArrowUp className="w-3 h-3 text-brand-600" />
       : <Icon.ArrowDown className="w-3 h-3 text-brand-600" />
+  }
+
+  const onDragStart = (e, id) => {
+    setDragId(id)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(id))
+  }
+  const onDragOver = (e, id) => {
+    if (!dragEnabled) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (id !== overId) setOverId(id)
+  }
+  const onDrop = (e, targetId) => {
+    if (!dragEnabled) return
+    e.preventDefault()
+    setOverId(null)
+    if (!dragId || dragId === targetId) return setDragId(null)
+    const currentIds = sorted.map((r) => rowKey(r))
+    const fromIdx = currentIds.indexOf(dragId)
+    const toIdx = currentIds.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) return setDragId(null)
+    const nextIds = [...currentIds]
+    const [moved] = nextIds.splice(fromIdx, 1)
+    nextIds.splice(toIdx, 0, moved)
+    const byId = Object.fromEntries(sorted.map((r) => [rowKey(r), r]))
+    onReorder(nextIds.map((id) => byId[id]))
+    setDragId(null)
   }
 
   if (loading) {
@@ -102,6 +131,7 @@ export default function DataTable({
       <table className="table-premium">
         <thead>
           <tr>
+            {dragEnabled && <th className="w-8 !px-2" aria-label="Reordenar" />}
             {columns.map((c) => (
               <th key={c.key} className={`${alignClass(c.align)} ${c.className || ''}`}>
                 {c.sortable ? (
@@ -118,8 +148,26 @@ export default function DataTable({
         <tbody>
           {sorted.map((row) => {
             const inactive = rowInactive?.(row)
+            const id = rowKey(row)
+            const isDragging = dragId === id
+            const isOver = overId === id && dragId !== id
             return (
-              <tr key={rowKey(row)} className={inactive ? 'row-inactive' : ''}>
+              <tr
+                key={id}
+                draggable={dragEnabled}
+                onDragStart={dragEnabled ? (e) => onDragStart(e, id) : undefined}
+                onDragOver={dragEnabled ? (e) => onDragOver(e, id) : undefined}
+                onDrop={dragEnabled ? (e) => onDrop(e, id) : undefined}
+                onDragEnd={dragEnabled ? () => { setDragId(null); setOverId(null) } : undefined}
+                className={`${inactive ? 'row-inactive' : ''}
+                            ${isDragging ? 'opacity-40' : ''}
+                            ${isOver ? 'ring-2 ring-brand-400 ring-inset' : ''}`}
+              >
+                {dragEnabled && (
+                  <td className="!px-2 w-8 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500">
+                    <Icon.Drag className="w-4 h-4" />
+                  </td>
+                )}
                 {columns.map((c) => (
                   <td key={c.key} className={`${alignClass(c.align)} ${c.className || ''}`}>
                     {c.render ? c.render(row) : renderDefault(row[c.key])}
@@ -137,6 +185,14 @@ export default function DataTable({
           })}
         </tbody>
       </table>
+
+      {onReorder && !dragEnabled && (
+        <p className="px-4 py-2 text-xs text-slate-400 border-t border-slate-100 bg-slate-50/50">
+          {sort.key
+            ? 'Quitá el orden por columna para poder reordenar arrastrando.'
+            : 'Limpiá el buscador para poder reordenar arrastrando.'}
+        </p>
+      )}
     </div>
   )
 }

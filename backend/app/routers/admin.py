@@ -1,5 +1,5 @@
 """Admin panel: CRUD de trabajadores, usuarios y catálogos maestros. Solo rol admin."""
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -334,11 +334,37 @@ def _crud_soft_delete(table: str, id_: UUID, flag_col: str) -> None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Registro no encontrado")
 
 
+def _crud_reorder(table: str, ids: List[UUID]) -> None:
+    """Aplica sort_order = posición+1 a la lista de IDs recibida.
+    Los IDs no incluidos quedan con su sort_order actual (útil para reordenar
+    sólo una página o una selección)."""
+    if not ids:
+        return
+    with get_db() as conn, conn.cursor() as cur:
+        # Update en una sola query usando UNNEST — barato y atómico.
+        cur.execute(
+            f"""
+            UPDATE {table} AS t
+               SET sort_order = v.rn
+              FROM (
+                  SELECT id::uuid, rn::int
+                    FROM UNNEST(%s::uuid[], %s::int[]) AS x(id, rn)
+              ) AS v
+             WHERE t.id = v.id;
+            """,
+            ([str(i) for i in ids], list(range(1, len(ids) + 1))),
+        )
+
+
+class ReorderPayload(BaseModel):
+    ids: List[UUID] = Field(..., min_length=1, max_length=500)
+
+
 # ---------- Áreas ----------
 
 @router.get("/areas")
 def list_areas():
-    return _crud_list("construccion.m_area", "codarea")
+    return _crud_list("construccion.m_area", "sort_order, codarea")
 
 
 @router.post("/areas", status_code=201)
@@ -356,6 +382,11 @@ def delete_area(area_id: UUID):
     _crud_soft_delete("construccion.m_area", area_id, "flgactivoarea")
 
 
+@router.post("/areas/reorder", status_code=204)
+def reorder_areas(payload: ReorderPayload):
+    _crud_reorder("construccion.m_area", payload.ids)
+
+
 # ---------- Especialidades ----------
 
 @router.get("/especialidades")
@@ -366,7 +397,7 @@ def list_especialidades():
             SELECT e.*, a.nbrarea AS area_nombre
               FROM construccion.m_especialidad e
               LEFT JOIN construccion.m_area a ON a.id = e.area_id
-             ORDER BY a.nbrarea, e.codespecialidad;
+             ORDER BY e.sort_order, a.nbrarea, e.codespecialidad;
             """
         )
         return [dict(r) for r in cur.fetchall()]
@@ -387,6 +418,11 @@ def delete_especialidad(esp_id: UUID):
     _crud_soft_delete("construccion.m_especialidad", esp_id, "flgactivoespecialidad")
 
 
+@router.post("/especialidades/reorder", status_code=204)
+def reorder_especialidades(payload: ReorderPayload):
+    _crud_reorder("construccion.m_especialidad", payload.ids)
+
+
 # ---------- Centros de costo ----------
 
 @router.get("/centros-costo")
@@ -398,7 +434,7 @@ def list_centros_costo():
               FROM construccion.m_centrocosto cc
               LEFT JOIN construccion.m_especialidad e ON e.id = cc.especialidad_id
               LEFT JOIN construccion.m_area a ON a.id = e.area_id
-             ORDER BY a.nbrarea, e.nbrespecialidad, cc.codcentrocosto;
+             ORDER BY cc.sort_order, a.nbrarea, e.nbrespecialidad, cc.codcentrocosto;
             """
         )
         return [dict(r) for r in cur.fetchall()]
@@ -419,11 +455,16 @@ def delete_centro_costo(cc_id: UUID):
     _crud_soft_delete("construccion.m_centrocosto", cc_id, "flgactivocentrocosto")
 
 
+@router.post("/centros-costo/reorder", status_code=204)
+def reorder_centros_costo(payload: ReorderPayload):
+    _crud_reorder("construccion.m_centrocosto", payload.ids)
+
+
 # ---------- Proyectos ----------
 
 @router.get("/proyectos")
 def list_proyectos():
-    return _crud_list("construccion.m_proyecto", "codproyecto")
+    return _crud_list("construccion.m_proyecto", "sort_order, codproyecto")
 
 
 @router.post("/proyectos", status_code=201)
@@ -441,11 +482,16 @@ def delete_proyecto(proy_id: UUID):
     _crud_soft_delete("construccion.m_proyecto", proy_id, "flgactivoproyecto")
 
 
+@router.post("/proyectos/reorder", status_code=204)
+def reorder_proyectos(payload: ReorderPayload):
+    _crud_reorder("construccion.m_proyecto", payload.ids)
+
+
 # ---------- Categorías de trabajador ----------
 
 @router.get("/categorias")
 def list_categorias():
-    return _crud_list("construccion.m_categoria_trabajador", "codcategoria")
+    return _crud_list("construccion.m_categoria_trabajador", "sort_order, codcategoria")
 
 
 @router.post("/categorias", status_code=201)
@@ -461,3 +507,8 @@ def update_categoria(cat_id: UUID, payload: CategoriaUpdate):
 @router.delete("/categorias/{cat_id}", status_code=204)
 def delete_categoria(cat_id: UUID):
     _crud_soft_delete("construccion.m_categoria_trabajador", cat_id, "flgactivocategoria")
+
+
+@router.post("/categorias/reorder", status_code=204)
+def reorder_categorias(payload: ReorderPayload):
+    _crud_reorder("construccion.m_categoria_trabajador", payload.ids)

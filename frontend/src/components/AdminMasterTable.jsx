@@ -39,6 +39,7 @@ export default function AdminMasterTable({
   const [search, setSearch] = useState('')
   const [dynOptions, setDynOptions] = useState({})
   const [confirmingDelete, setConfirmingDelete] = useState(null)
+  const [reorderError, setReorderError] = useState('')
 
   const load = () => {
     setLoading(true)
@@ -112,6 +113,21 @@ export default function AdminMasterTable({
     load()
   }
 
+  // Reorder optimista: mostramos el orden nuevo al toque, luego persistimos.
+  // Si el backend falla, recargamos para volver al orden real.
+  const handleReorder = async (newItems) => {
+    if (!api.reorder) return
+    setReorderError('')
+    const prev = items
+    setItems(newItems)
+    try {
+      await api.reorder(newItems.map((r) => r.id))
+    } catch (err) {
+      setReorderError(err.response?.data?.detail || 'No se pudo guardar el orden')
+      setItems(prev) // rollback
+    }
+  }
+
   // Enriquecer columnas: boolean → pill de estado
   const enrichedColumns = columns.map((c) => {
     if (c.render) return c
@@ -167,6 +183,12 @@ export default function AdminMasterTable({
         onPrimary={openNew}
       />
 
+      {reorderError && (
+        <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">
+          {reorderError}
+        </div>
+      )}
+
       <DataTable
         items={items}
         columns={enrichedColumns}
@@ -175,6 +197,7 @@ export default function AdminMasterTable({
         searchKeys={searchKeys}
         rowActions={rowActions}
         rowInactive={(row) => deleteFlagField && row[deleteFlagField] === false}
+        onReorder={api.reorder ? handleReorder : undefined}
         empty={{
           title: `Sin ${countLabel || title.toLowerCase()}`,
           message: search
