@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from psycopg2.errors import UniqueViolation
 
 from app.auth.schemas import UserPublic
 from app.repositories import actividades as repo
@@ -14,11 +15,29 @@ from app.schemas.actividades import (
 )
 
 
+def _format_conflict_msg(conflictos: List[Dict[str, Any]], fecha: date) -> str:
+    """Arma el detalle HTTP 409 listando los trabajadores ya asignados."""
+    nombres = ", ".join(c["nbrcompleto"] for c in conflictos)
+    if len(conflictos) > 1:
+        prefijo = "Los siguientes trabajadores tienen"
+    else:
+        prefijo = "El siguiente trabajador tiene"
+    return (
+        f"{prefijo} una actividad iniciada el {fecha.isoformat()}: "
+        f"{nombres}. Finaliza la actividad en curso antes de asignar una nueva."
+    )
+
+
 def create_bulk(payload: ActividadCreateBulk, user: UserPublic) -> Dict[str, Any]:
     """Crea N actividades para los trabajadores seleccionados.
 
-    Regla: solo admin y supervisor pueden crear actividades (los trabajadores
-    ven las suyas pero no crean).
+    Reglas:
+    - Solo admin y supervisor pueden crear actividades (los trabajadores
+      ven las suyas pero no crean).
+    - Un trabajador NO puede tener dos actividades 'iniciado' el mismo día.
+      Se valida antes con find_trabajadores_con_iniciada (mensaje amigable);
+      además la DB tiene UNIQUE INDEX parcial como safety net contra race
+      condition (dos supervisores creando al mismo tiempo).
     """
     if user.role not in ("admin", "supervisor"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Rol no autorizado para crear actividades")
@@ -29,14 +48,38 @@ def create_bulk(payload: ActividadCreateBulk, user: UserPublic) -> Dict[str, Any
     # Dedup: por si el frontend manda el mismo id dos veces.
     unique_ids = list({tid for tid in payload.trabajador_ids})
 
-    inserted = repo.insert_bulk(
-        trabajador_ids=unique_ids,
-        fecactividad=payload.fecactividad,
-        proyecto_id=payload.proyecto_id,
-        centro_costo_id=payload.centro_costo_id,
-        desactividad=payload.desactividad,
-        created_by=user.id,
-    )
+    # Pre-check: rechazar temprano con mensaje amigable listando los trabajadores
+    # ocupados. Esto es lo que verá el usuario en el 99% de los casos (la UI ya
+    # los filtra, pero pasan cosas: lag entre pestañas, cache viejo, etc.).
+    conflictos = repo.find_trabajadores_con_iniciada(unique_ids, payload.fecactividad)
+    if conflictos:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            _format_conflict_msg(conflictos, payload.fecactividad),
+        )
+
+    # Insert con safety net: si dos requests llegan simultáneamente y ambos
+    # pasan el pre-check, el UNIQUE INDEX parcial rechaza el INSERT en la DB.
+    try:
+        inserted = repo.insert_bulk(
+            trabajador_ids=unique_ids,
+            fecactividad=payload.fecactividad,
+            proyecto_id=payload.proyecto_id,
+            centro_costo_id=payload.centro_costo_id,
+            desactividad=payload.desactividad,
+            created_by=user.id,
+        )
+    except UniqueViolation:
+        # Race condition: entre el pre-check y el insert, otro admin creó una
+        # actividad para los mismos trabajadores. Devolvemos el mismo error 409
+        # pero recalculando los conflictos actuales para el mensaje.
+        conflictos = repo.find_trabajadores_con_iniciada(unique_ids, payload.fecactividad)
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            _format_conflict_msg(conflictos, payload.fecactividad)
+            if conflictos
+            else "Otro usuario asignó a estos trabajadores al mismo tiempo. Refresca la lista e intenta de nuevo.",
+        )
     return {"created": inserted, "requested": len(unique_ids)}
 
 

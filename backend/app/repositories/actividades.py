@@ -6,6 +6,35 @@ from uuid import UUID
 from app.database import get_db
 
 
+def find_trabajadores_con_iniciada(
+    trabajador_ids: List[UUID],
+    fecactividad: date,
+) -> List[Dict[str, Any]]:
+    """Devuelve los trabajadores del set que YA tienen una actividad
+    'iniciado' esa fecha. Sirve para pre-validar antes de insert_bulk y
+    devolver un error amigable listando los conflictos.
+
+    Retorna [{id, nbrcompleto}] — vacío si no hay conflictos.
+    """
+    if not trabajador_ids:
+        return []
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT t.id, t.nbrcompleto
+              FROM construccion.m_trabajador t
+              JOIN construccion.m_actividad a
+                ON a.trabajador_id = t.id
+               AND a.fecactividad = %s
+               AND a.desestadoactividad = 'iniciado'
+             WHERE t.id = ANY(%s::uuid[])
+             ORDER BY t.nbrcompleto;
+            """,
+            (fecactividad, [str(i) for i in trabajador_ids]),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
 def insert_bulk(
     trabajador_ids: List[UUID],
     fecactividad: date,
@@ -17,6 +46,10 @@ def insert_bulk(
     """Inserta N actividades (una por trabajador). Retorna cantidad insertada.
 
     Loop simple es aceptable: bulk-create suele ser <100 filas por operación.
+    El caller debe validar duplicados de "iniciada por día" antes (ver
+    find_trabajadores_con_iniciada). Si aun así llega una race condition, el
+    UNIQUE INDEX parcial ux_actividad_una_iniciada_por_dia rechaza el INSERT
+    con IntegrityError — el service lo captura y traduce a HTTP 409.
     """
     inserted = 0
     with get_db() as conn, conn.cursor() as cur:
