@@ -1,6 +1,6 @@
 """Endpoints de catálogos maestros (read-only para todos los roles autenticados)."""
 from datetime import date
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -13,8 +13,11 @@ router = APIRouter(prefix="/api/catalogos", tags=["catalogos"])
 
 
 @router.get("/areas", response_model=List[dict])
-def get_areas(_: UserPublic = Depends(get_current_user)):
-    return repo.list_areas()
+def get_areas(
+    proyecto_id: Optional[UUID] = Query(default=None, description="Filtrar por proyecto"),
+    _: UserPublic = Depends(get_current_user),
+):
+    return repo.list_areas(proyecto_id=proyecto_id)
 
 
 @router.get("/especialidades", response_model=List[dict])

@@ -6,17 +6,30 @@ from uuid import UUID
 from app.database import get_db
 
 
-def list_areas() -> List[dict]:
+def list_areas(proyecto_id: Optional[UUID] = None) -> List[dict]:
+    """Áreas activas. Si `proyecto_id` viene, sólo las del proyecto."""
     with get_db() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT id, codarea, nbrarea,
-                   CONCAT(codarea, ' - ', nbrarea) AS display_name
-              FROM construccion.m_area
-             WHERE flgactivoarea = true
-             ORDER BY codarea;
-            """
-        )
+        if proyecto_id:
+            cur.execute(
+                """
+                SELECT id, codarea, nbrarea, proyecto_id,
+                       CONCAT(codarea, ' - ', nbrarea) AS display_name
+                  FROM construccion.m_area
+                 WHERE flgactivoarea = true AND proyecto_id = %s
+                 ORDER BY sort_order, codarea;
+                """,
+                (str(proyecto_id),),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, codarea, nbrarea, proyecto_id,
+                       CONCAT(codarea, ' - ', nbrarea) AS display_name
+                  FROM construccion.m_area
+                 WHERE flgactivoarea = true
+                 ORDER BY sort_order, codarea;
+                """
+            )
         return [dict(r) for r in cur.fetchall()]
 
 

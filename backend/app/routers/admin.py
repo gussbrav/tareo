@@ -2,8 +2,10 @@
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, EmailStr, Field
+
+from app.services.ceco_importer import parse_ceco_workbook, import_to_proyecto
 
 from app.auth.dependencies import require_role
 from app.auth.password import hash_password
@@ -222,12 +224,14 @@ def delete_user(user_id: UUID):
 class AreaCreate(BaseModel):
     codarea: str = Field(..., min_length=1, max_length=30)
     nbrarea: str = Field(..., min_length=1, max_length=255)
+    proyecto_id: UUID  # obligatorio: cada área pertenece a un proyecto
     flgactivoarea: bool = True
 
 
 class AreaUpdate(BaseModel):
     codarea: Optional[str] = Field(default=None, min_length=1, max_length=30)
     nbrarea: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    proyecto_id: Optional[UUID] = None  # se puede mover un área a otro proyecto
     flgactivoarea: Optional[bool] = None
 
 
@@ -363,12 +367,50 @@ class ReorderPayload(BaseModel):
 # ---------- Áreas ----------
 
 @router.get("/areas")
-def list_areas():
-    return _crud_list("construccion.m_area", "sort_order, codarea")
+def list_areas(proyecto_id: Optional[UUID] = Query(default=None, description="Filtrar por proyecto")):
+    """Lista de áreas. Si `proyecto_id` viene, filtra sólo las del proyecto.
+    Sin filtro devuelve todas (útil para admin viendo el total global)."""
+    with get_db() as conn, conn.cursor() as cur:
+        if proyecto_id:
+            cur.execute(
+                """
+                SELECT a.*, p.nbrproyecto AS proyecto_nombre,
+                       p.descontratoproyecto AS proyecto_contrato
+                  FROM construccion.m_area a
+                  LEFT JOIN construccion.m_proyecto p ON p.id = a.proyecto_id
+                 WHERE a.proyecto_id = %s
+                 ORDER BY a.sort_order, a.codarea;
+                """,
+                (str(proyecto_id),),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT a.*, p.nbrproyecto AS proyecto_nombre,
+                       p.descontratoproyecto AS proyecto_contrato
+                  FROM construccion.m_area a
+                  LEFT JOIN construccion.m_proyecto p ON p.id = a.proyecto_id
+                 ORDER BY a.sort_order, a.codarea;
+                """
+            )
+        return [dict(r) for r in cur.fetchall()]
 
 
 @router.post("/areas", status_code=201)
 def create_area(payload: AreaCreate):
+    # Validación explícita: el código debe ser único dentro del proyecto.
+    # La constraint UNIQUE(proyecto_id, codarea) del DB también lo garantiza,
+    # pero devolvemos un error legible antes que un IntegrityError crudo.
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM construccion.m_area WHERE proyecto_id = %s AND codarea = %s;",
+            (str(payload.proyecto_id), payload.codarea),
+        )
+        if cur.fetchone():
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"Ya existe un área con código '{payload.codarea}' en este proyecto",
+            )
     return _crud_insert("construccion.m_area", payload.model_dump())
 
 
@@ -390,16 +432,29 @@ def reorder_areas(payload: ReorderPayload):
 # ---------- Especialidades ----------
 
 @router.get("/especialidades")
-def list_especialidades():
+def list_especialidades(proyecto_id: Optional[UUID] = Query(default=None)):
+    """Especialidades — con filtro opcional por proyecto (hereda de área)."""
     with get_db() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT e.*, a.nbrarea AS area_nombre
-              FROM construccion.m_especialidad e
-              LEFT JOIN construccion.m_area a ON a.id = e.area_id
-             ORDER BY e.sort_order, a.nbrarea, e.codespecialidad;
-            """
-        )
+        if proyecto_id:
+            cur.execute(
+                """
+                SELECT e.*, a.nbrarea AS area_nombre, a.proyecto_id
+                  FROM construccion.m_especialidad e
+                  LEFT JOIN construccion.m_area a ON a.id = e.area_id
+                 WHERE a.proyecto_id = %s
+                 ORDER BY e.sort_order, a.nbrarea, e.codespecialidad;
+                """,
+                (str(proyecto_id),),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT e.*, a.nbrarea AS area_nombre, a.proyecto_id
+                  FROM construccion.m_especialidad e
+                  LEFT JOIN construccion.m_area a ON a.id = e.area_id
+                 ORDER BY e.sort_order, a.nbrarea, e.codespecialidad;
+                """
+            )
         return [dict(r) for r in cur.fetchall()]
 
 
@@ -426,17 +481,33 @@ def reorder_especialidades(payload: ReorderPayload):
 # ---------- Centros de costo ----------
 
 @router.get("/centros-costo")
-def list_centros_costo():
+def list_centros_costo(proyecto_id: Optional[UUID] = Query(default=None)):
+    """Centros de costo — con filtro opcional por proyecto (hereda de esp → área)."""
     with get_db() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT cc.*, e.nbrespecialidad AS especialidad_nombre, a.nbrarea AS area_nombre
-              FROM construccion.m_centrocosto cc
-              LEFT JOIN construccion.m_especialidad e ON e.id = cc.especialidad_id
-              LEFT JOIN construccion.m_area a ON a.id = e.area_id
-             ORDER BY cc.sort_order, a.nbrarea, e.nbrespecialidad, cc.codcentrocosto;
-            """
-        )
+        if proyecto_id:
+            cur.execute(
+                """
+                SELECT cc.*, e.nbrespecialidad AS especialidad_nombre,
+                       a.nbrarea AS area_nombre, a.proyecto_id
+                  FROM construccion.m_centrocosto cc
+                  LEFT JOIN construccion.m_especialidad e ON e.id = cc.especialidad_id
+                  LEFT JOIN construccion.m_area a ON a.id = e.area_id
+                 WHERE a.proyecto_id = %s
+                 ORDER BY cc.sort_order, a.nbrarea, e.nbrespecialidad, cc.codcentrocosto;
+                """,
+                (str(proyecto_id),),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT cc.*, e.nbrespecialidad AS especialidad_nombre,
+                       a.nbrarea AS area_nombre, a.proyecto_id
+                  FROM construccion.m_centrocosto cc
+                  LEFT JOIN construccion.m_especialidad e ON e.id = cc.especialidad_id
+                  LEFT JOIN construccion.m_area a ON a.id = e.area_id
+                 ORDER BY cc.sort_order, a.nbrarea, e.nbrespecialidad, cc.codcentrocosto;
+                """
+            )
         return [dict(r) for r in cur.fetchall()]
 
 
@@ -512,3 +583,56 @@ def delete_categoria(cat_id: UUID):
 @router.post("/categorias/reorder", status_code=204)
 def reorder_categorias(payload: ReorderPayload):
     _crud_reorder("construccion.m_categoria_trabajador", payload.ids)
+
+
+# ============================================================
+# Importador Excel — jerarquía Área > Especialidad > CC por proyecto
+# ============================================================
+
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
+@router.post("/proyectos/{proyecto_id}/preview-cecos")
+async def preview_import_cecos(proyecto_id: UUID, archivo: UploadFile = File(...)):
+    """Valida el Excel y devuelve preview sin escribir en DB.
+    Usado por la UI antes de confirmar la importación."""
+    contents = await archivo.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"Archivo demasiado grande (máx {MAX_UPLOAD_BYTES // 1024 // 1024} MB)"
+        )
+    parsed = parse_ceco_workbook(contents)
+    # Sample: primeras 8 filas para mostrar al usuario
+    sample = parsed["rows"][:8]
+    return {
+        "sheet_name": parsed["sheet_name"],
+        "total_rows": len(parsed["rows"]),
+        "warnings": parsed["warnings"][:20],  # limit
+        "sample": sample,
+        "will_touch": {
+            "areas_unicas": len({r["cod01"] for r in parsed["rows"]}),
+            "especialidades_unicas": len({(r["cod01"], r["cod02"]) for r in parsed["rows"]}),
+            "centros_costo_unicos": len({(r["cod01"], r["cod02"], r["cod03"]) for r in parsed["rows"]}),
+        },
+    }
+
+
+@router.post("/proyectos/{proyecto_id}/importar-cecos")
+async def importar_cecos(proyecto_id: UUID, archivo: UploadFile = File(...)):
+    """Importa la jerarquía completa (áreas + especialidades + CC) al proyecto.
+    Idempotente: upsertea por códigos. Retorna resumen con contadores."""
+    contents = await archivo.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"Archivo demasiado grande (máx {MAX_UPLOAD_BYTES // 1024 // 1024} MB)"
+        )
+    parsed = parse_ceco_workbook(contents)
+    if not parsed["rows"]:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "El Excel no tiene filas válidas para importar"
+        )
+    result = import_to_proyecto(proyecto_id, parsed)
+    return result
