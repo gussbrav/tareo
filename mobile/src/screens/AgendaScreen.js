@@ -27,7 +27,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { actividadesApi } from '../api/actividades'
 import { useAuthStore } from '../store/auth'
+import { useActiveProjectStore } from '../store/project'
 import { colors, pastelFor, radius, shadow, spacing, type } from '../theme'
+import ActiveProjectChip from '../ui/ActiveProjectChip'
 import Icon from '../ui/Icons'
 
 const DIAS_CORTOS = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
@@ -95,6 +97,7 @@ const VIEWS = [
 
 export default function AgendaScreen({ navigation }) {
   const { user } = useAuthStore()
+  const activeProjectId = useActiveProjectStore((s) => s.activeProjectId)
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor'
   const canCreate = canEdit
 
@@ -113,7 +116,7 @@ export default function AgendaScreen({ navigation }) {
     if (!silent) setLoading(true)
     setError('')
     try {
-      const res = await actividadesApi.listarMes(currentMes)
+      const res = await actividadesApi.listarMes(currentMes, { proyectoId: activeProjectId })
       setMonthActs(res.actividades || [])
     } catch {
       if (!silent) setError('No se pudo cargar la agenda')
@@ -121,7 +124,7 @@ export default function AgendaScreen({ navigation }) {
       if (!silent) setLoading(false)
       setRefreshing(false)
     }
-  }, [currentMes])
+  }, [currentMes, activeProjectId])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
   useEffect(() => {
@@ -176,6 +179,11 @@ export default function AgendaScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {/* Barra fina con el chip de proyecto activo (paridad web) */}
+      <View style={styles.projectBar}>
+        <ActiveProjectChip />
+      </View>
+
       {/* Header con selector de mes */}
       <View style={styles.header}>
         <Pressable
@@ -528,6 +536,14 @@ function GrupoActividad({ grupo, expanded, onToggle, canEdit, onEdit }) {
 // ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
+
+  // Barra fina con el chip del proyecto activo
+  projectBar: {
+    paddingHorizontal: spacing.base,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+    backgroundColor: colors.surface,
+  },
 
   // Header con selector de mes
   header: {

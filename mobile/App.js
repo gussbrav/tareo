@@ -15,6 +15,7 @@ import NuevaActividadScreen from './src/screens/NuevaActividadScreen'
 import ReportesScreen from './src/screens/ReportesScreen'
 import TareoScreen from './src/screens/TareoScreen'
 import { hydrate, useAuthStore } from './src/store/auth'
+import { hydrateActiveProject } from './src/store/project'
 import { colors, radius, shadow, spacing, type } from './src/theme'
 import Icon from './src/ui/Icons'
 
@@ -168,7 +169,8 @@ export default function App() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    hydrate().finally(() => setReady(true))
+    // Rehidratación en paralelo (auth + proyecto activo persistido)
+    Promise.all([hydrate(), hydrateActiveProject()]).finally(() => setReady(true))
   }, [])
 
   if (!ready) {

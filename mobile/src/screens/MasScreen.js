@@ -15,9 +15,10 @@ import Icon from '../ui/Icons'
 import SectionTitle from '../ui/SectionTitle'
 import { api } from '../api/client'
 import { useAuthStore } from '../store/auth'
+import { useActiveProjectStore } from '../store/project'
 import { colors, radius, shadow, spacing, type } from '../theme'
 
-const APP_VERSION = '0.8.5'
+const APP_VERSION = '0.9.0'
 const WEB_BASE =
   Constants.expoConfig?.extra?.apiBaseUrl?.replace(/\/$/, '') ||
   'https://tareo.azoramind.com'
@@ -50,6 +51,9 @@ export default function MasScreen({ navigation }) {
             } catch {
               /* silencioso */
             }
+            // Limpieza de "Proyecto activo" — evita que el próximo user
+            // vea el contexto del anterior (paridad web UserMenu).
+            await useActiveProjectStore.getState().clearActiveProject()
             await logout()
           },
         },

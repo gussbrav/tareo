@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import ActiveProjectChip from '../ui/ActiveProjectChip'
 import AlertBanner from '../ui/AlertBanner'
 import KpiCard from '../ui/KpiCard'
 import PeriodChips from '../ui/PeriodChips'
@@ -22,6 +23,7 @@ import WelcomeHeader from '../ui/WelcomeHeader'
 import { configApi } from '../api/config'
 import { reportesApi } from '../api/reportes'
 import { useAuthStore } from '../store/auth'
+import { useActiveProjectStore } from '../store/project'
 import { colors, spacing, type } from '../theme'
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -87,6 +89,7 @@ const RANGO_LABEL_LARGO = (desde, hasta) => {
 // ── screen ────────────────────────────────────────────────────────────────
 export default function HomeScreen({ navigation }) {
   const user = useAuthStore((s) => s.user)
+  const activeProjectId = useActiveProjectStore((s) => s.activeProjectId)
   const [periodo, setPeriodo] = useState('semana')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -98,7 +101,7 @@ export default function HomeScreen({ navigation }) {
     setError('')
     const { desde, hasta } = rangeFromPeriodo(periodo)
     try {
-      const data = await reportesApi.dashboard(desde, hasta)
+      const data = await reportesApi.dashboard(desde, hasta, activeProjectId)
       setDashboard(data)
     } catch (e) {
       setError('No se pudo cargar el dashboard')
@@ -106,7 +109,7 @@ export default function HomeScreen({ navigation }) {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [periodo])
+  }, [periodo, activeProjectId])
 
   useEffect(() => {
     setLoading(true)
@@ -152,6 +155,11 @@ export default function HomeScreen({ navigation }) {
           role={user?.role || 'trabajador'}
           logoUrl={brand.logo_url}
         />
+
+        {/* Chip del proyecto activo — visible solo si hay ≥2 proyectos */}
+        <View style={styles.projectBarWrap}>
+          <ActiveProjectChip />
+        </View>
 
         <PeriodChips value={periodo} onChange={setPeriodo} />
 
@@ -243,6 +251,10 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   scroll: { paddingBottom: spacing['4xl'] },
+  projectBarWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
   rangeRow: { paddingHorizontal: spacing.lg, marginTop: -spacing.xs, marginBottom: spacing.xs },
   rangeText: { ...type.caption, color: colors.text.tertiary },
   alertWrap: { marginTop: spacing.md },

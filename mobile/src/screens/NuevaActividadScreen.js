@@ -20,6 +20,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { actividadesApi, catalogosApi } from '../api/actividades'
+import { useActiveProjectStore } from '../store/project'
 import { colors, radius, shadow, spacing, type } from '../theme'
 import DateField from '../ui/DateField'
 import Icon from '../ui/Icons'
@@ -111,7 +112,7 @@ export default function NuevaActividadScreen({ navigation }) {
   const [trabajadores, setTrabajadores] = useState([])
   const [searchWorker, setSearchWorker] = useState('')
 
-  const [proyectoId, setProyectoId] = useState(null)
+  const [proyectoId, setProyectoIdState] = useState(null)
   const [areaId, setAreaId] = useState(null)
   const [especialidadId, setEspecialidadId] = useState(null)
   const [centroCostoId, setCentroCostoId] = useState(null)
@@ -121,13 +122,27 @@ export default function NuevaActividadScreen({ navigation }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // Carga proyectos al inicio
+  // Proyecto activo — prefill + sincronización bidireccional con el store.
+  const { activeProjectId, setActiveProjectId } = useActiveProjectStore()
+
+  // Setter que actualiza el form Y el store — así el ActiveProjectChip
+  // del topbar refleja el cambio inmediatamente (paridad web).
+  const setProyectoId = (id) => {
+    setProyectoIdState(id)
+    if (id) setActiveProjectId(id)
+  }
+
+  // Carga proyectos al inicio y prefill según activeProjectId si aplica.
   useEffect(() => {
     catalogosApi
       .proyectos()
       .then((prs) => {
         setProyectos(prs)
-        if (prs.length && !proyectoId) setProyectoId(prs[0].id)
+        if (!prs.length) return
+        // Prefill: si el user tiene un proyecto activo con acceso, usarlo.
+        // Sino, el primero (fallback default).
+        const hasAccess = activeProjectId && prs.some((p) => p.id === activeProjectId)
+        setProyectoIdState(hasAccess ? activeProjectId : prs[0].id)
       })
       .catch(() => Alert.alert('Error', 'No se pudieron cargar los proyectos'))
       .finally(() => setLoading(false))
@@ -176,11 +191,16 @@ export default function NuevaActividadScreen({ navigation }) {
       setDesactividad('')
       setSelectedTrabajadores([])
       setSearchWorker('')
+      // Resync del proyecto activo con lo que puso el user en el topbar
+      // desde otro tab (paridad total del store).
+      if (activeProjectId && proyectos.some((p) => p.id === activeProjectId)) {
+        setProyectoIdState(activeProjectId)
+      }
       catalogosApi
         .trabajadoresDisponibles(t)
         .then(setTrabajadores)
         .catch(() => setTrabajadores([]))
-    }, []),
+    }, [activeProjectId, proyectos]),
   )
 
   useEffect(() => {
@@ -273,7 +293,13 @@ export default function NuevaActividadScreen({ navigation }) {
           onPress: () => {
             // Limpieza total — el user elige todo desde cero. La fecha
             // queda (uso típico: registrar varias del mismo día).
-            setProyectoId(proyectos[0]?.id || null)
+            // Proyecto: mantenemos el activo si sigue accesible (paridad
+            // web: no molestar al user re-eligiendo cada vez).
+            const keepProject =
+              activeProjectId && proyectos.some((p) => p.id === activeProjectId)
+                ? activeProjectId
+                : (proyectos[0]?.id || null)
+            setProyectoIdState(keepProject)
             setAreaId(null)
             setEspecialidadId(null)
             setCentroCostoId(null)

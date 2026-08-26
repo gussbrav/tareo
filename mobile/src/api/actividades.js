@@ -1,14 +1,21 @@
 import { api } from './client'
 
 export const actividadesApi = {
-  // Backend ahora devuelve { items, total, page, size, pages }. En mobile no
-  // paginamos aún (UI Gmail-style pendiente), así que pedimos el máximo (200)
-  // y desempaquetamos .items para no romper los consumidores existentes.
-  listar: (fecha) =>
-    api.get('/api/actividades', { params: { fecha, size: 200 } })
-      .then((r) => r.data?.items || []),
-  listarMes: (mes, filtros = {}) =>
-    api.get('/api/actividades/mes', { params: { mes, ...filtros } }).then((r) => r.data),
+  // Backend devuelve { items, total, page, size, pages }. En mobile no
+  // paginamos aún; pedimos el máximo (200) y desempaquetamos .items.
+  //
+  // `proyectoId` (opcional) viene del "Proyecto activo" del store.
+  // Se agrega al scope del user, no lo reemplaza.
+  listar: (fecha, { proyectoId = null } = {}) => {
+    const params = { fecha, size: 200 }
+    if (proyectoId) params.proyecto_id = proyectoId
+    return api.get('/api/actividades', { params }).then((r) => r.data?.items || [])
+  },
+  listarMes: (mes, { proyectoId = null, ...filtros } = {}) => {
+    const params = { mes, ...filtros }
+    if (proyectoId) params.proyecto_id = proyectoId
+    return api.get('/api/actividades/mes', { params }).then((r) => r.data)
+  },
   detalle: (id) => api.get(`/api/actividades/${id}`).then((r) => r.data),
   crearBulk: (payload) => api.post('/api/actividades', payload).then((r) => r.data),
   editar: (id, payload) => api.patch(`/api/actividades/${id}`, payload).then((r) => r.data),

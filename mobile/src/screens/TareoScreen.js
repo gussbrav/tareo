@@ -34,7 +34,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { actividadesApi } from '../api/actividades'
 import { useAuthStore } from '../store/auth'
+import { useActiveProjectStore } from '../store/project'
 import { colors, pastelFor, radius, shadow, spacing, type } from '../theme'
+import ActiveProjectChip from '../ui/ActiveProjectChip'
 import DateField from '../ui/DateField'
 import Icon from '../ui/Icons'
 
@@ -88,6 +90,7 @@ const ESTADO_FILTERS = [
 // ─── Screen ────────────────────────────────────────────────────────────────
 export default function TareoScreen({ navigation }) {
   const { user } = useAuthStore()
+  const activeProjectId = useActiveProjectStore((s) => s.activeProjectId)
   const [fecha, setFecha] = useState(today())
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
@@ -113,7 +116,7 @@ export default function TareoScreen({ navigation }) {
     setError('')
     setLoading(true)
     try {
-      const data = await actividadesApi.listar(fecha)
+      const data = await actividadesApi.listar(fecha, { proyectoId: activeProjectId })
       setItems(data)
       setSelectedIds(new Set())
     } catch {
@@ -122,7 +125,7 @@ export default function TareoScreen({ navigation }) {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [fecha])
+  }, [fecha, activeProjectId])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
@@ -240,15 +243,19 @@ export default function TareoScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Page header — patrón Appsmith original: título grande visible
-          para dar contexto al usuario nuevo. */}
+      {/* Page header — título + chip de proyecto activo + count */}
       <View style={styles.pageHeader}>
-        <Text style={styles.pageTitle}>Registro de tareo</Text>
-        {items.length > 0 ? (
-          <Text style={styles.pageSubtitle}>
-            {items.length} {items.length === 1 ? 'actividad' : 'actividades'}
-          </Text>
-        ) : null}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.pageTitle}>Registro de tareo</Text>
+          <View style={styles.pageMetaRow}>
+            <ActiveProjectChip />
+            {items.length > 0 ? (
+              <Text style={styles.pageSubtitle}>
+                {items.length} {items.length === 1 ? 'actividad' : 'actividades'}
+              </Text>
+            ) : null}
+          </View>
+        </View>
       </View>
 
       {/* Date bar */}
@@ -560,15 +567,16 @@ const styles = StyleSheet.create({
 
   // Page header (título de la vista)
   pageHeader: {
-    flexDirection: 'row', alignItems: 'baseline',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.base,
     paddingTop: spacing.base,
     paddingBottom: spacing.sm,
     backgroundColor: colors.surface,
-    gap: spacing.md,
   },
   pageTitle: { ...type.h1, color: colors.text.primary },
+  pageMetaRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    marginTop: 6, flexWrap: 'wrap',
+  },
   pageSubtitle: { ...type.caption, color: colors.text.tertiary, fontWeight: '600' },
 
   // Date bar
