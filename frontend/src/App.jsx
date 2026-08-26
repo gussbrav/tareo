@@ -32,13 +32,15 @@ export default function App() {
           }
         />
         <Route
-          path="/admin"
+          path="/configuracion"
           element={
             <RequireAuth roles={['admin']}>
               <Admin />
             </RequireAuth>
           }
         />
+        {/* Redirect del path viejo — evita romper bookmarks. */}
+        <Route path="/admin" element={<Navigate to="/configuracion" replace />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

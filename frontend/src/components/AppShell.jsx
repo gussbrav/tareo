@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 
 import { useAuthStore } from '../store/auth'
-import { api } from '../api/client'
 import { configApi } from '../api/config'
+import UserMenu from './UserMenu.jsx'
 
 const navBase =
   'px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
@@ -11,28 +11,17 @@ const navActive = 'bg-brand-600 text-white'
 const navInactive = 'text-slate-600 hover:bg-slate-100'
 
 export default function AppShell() {
-  const navigate = useNavigate()
-  const { user, refreshToken, logout } = useAuthStore()
+  const { user } = useAuthStore()
   const [brand, setBrand] = useState({ logo_url: '', company_name: 'Tareo' })
 
   useEffect(() => {
-    configApi.publicSettings().then(setBrand).catch(() => {})
+    const load = () => configApi.publicSettings().then(setBrand).catch(() => {})
+    load()
+    window.addEventListener('tareo:brand-updated', load)
+    return () => window.removeEventListener('tareo:brand-updated', load)
   }, [])
 
-  const handleLogout = async () => {
-    try {
-      if (refreshToken) {
-        await api.post('/api/auth/logout', { refresh_token: refreshToken })
-      }
-    } catch (_) {
-      /* ignore */
-    }
-    logout()
-    navigate('/login', { replace: true })
-  }
-
   const canCreate = user?.role === 'admin' || user?.role === 'supervisor'
-  const isAdmin = user?.role === 'admin'
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -76,25 +65,11 @@ export default function AppShell() {
               >
                 Dashboard
               </NavLink>
-              {isAdmin && (
-                <NavLink
-                  to="/admin"
-                  className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}
-                >
-                  Admin
-                </NavLink>
-              )}
             </nav>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-600 hidden sm:inline">
-              {user?.first_name || user?.email}
-              <span className="ml-1 text-xs text-slate-400">({user?.role})</span>
-            </span>
-            <button onClick={handleLogout} className="btn-secondary">
-              Salir
-            </button>
+            <UserMenu />
           </div>
         </div>
 
@@ -117,14 +92,6 @@ export default function AppShell() {
           >
             Dashboard
           </NavLink>
-          {isAdmin && (
-            <NavLink
-              to="/admin"
-              className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}
-            >
-              Admin
-            </NavLink>
-          )}
         </div>
       </header>
 

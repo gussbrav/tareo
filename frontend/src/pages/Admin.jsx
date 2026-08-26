@@ -165,9 +165,9 @@ export default function Admin() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Administración</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Configuración</h1>
         <p className="text-slate-500 text-sm">
-          Gestión de configuración, equipo y catálogos maestros.
+          Estado del sistema, marca, equipo y catálogos maestros.
         </p>
       </div>
 
