@@ -31,7 +31,10 @@ def public_settings() -> Dict[str, str]:
         cur.execute(
             """
             SELECT key, value FROM public.system_settings
-             WHERE key IN ('company_name', 'company_taxid', 'app_environment_label');
+             WHERE key IN (
+               'company_name', 'company_taxid', 'app_environment_label',
+               'logo_url', 'brand_primary_color', 'brand_accent_color'
+             );
             """
         )
         return {r["key"]: r["value"] or "" for r in cur.fetchall()}
@@ -57,14 +60,14 @@ class SystemStatus(BaseModel):
 def system_general(_: UserPublic = Depends(require_role("admin", "supervisor"))) -> SystemStatus:
     s = get_settings()
     db_ok = False
-    db_engine = "unknown"
     try:
         with get_db() as conn, conn.cursor() as cur:
-            cur.execute("SELECT version();")
-            db_engine = (cur.fetchone()["version"] or "").split(",")[0]
+            cur.execute("SELECT 1;")
+            cur.fetchone()
             db_ok = True
     except Exception:
         db_ok = False
+    db_engine = "PostgreSQL — Base de datos principal"
 
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(
@@ -102,7 +105,8 @@ class SettingItem(BaseModel):
 
 
 class SettingUpdate(BaseModel):
-    value: str = Field(..., max_length=2000)
+    # 2 MB alcanza para un logo PNG base64 razonable (típico: 20-200 KB).
+    value: str = Field(..., max_length=2_000_000)
 
 
 @router.get("/settings", response_model=List[SettingItem])

@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import { useAuthStore } from '../store/auth'
 import { api } from '../api/client'
+import { configApi } from '../api/config'
 
 const navBase =
   'px-3 py-1.5 rounded-md text-sm font-medium transition-colors'
@@ -11,6 +13,11 @@ const navInactive = 'text-slate-600 hover:bg-slate-100'
 export default function AppShell() {
   const navigate = useNavigate()
   const { user, refreshToken, logout } = useAuthStore()
+  const [brand, setBrand] = useState({ logo_url: '', company_name: 'Tareo' })
+
+  useEffect(() => {
+    configApi.publicSettings().then(setBrand).catch(() => {})
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -33,11 +40,23 @@ export default function AppShell() {
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-brand-600 text-white font-bold">
-                T
-              </span>
+              {brand.logo_url ? (
+                <img
+                  src={brand.logo_url}
+                  alt={brand.company_name || 'Logo'}
+                  className="h-8 w-auto max-w-[140px] object-contain"
+                />
+              ) : (
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-brand-600 text-white font-bold">
+                  T
+                </span>
+              )}
               <span className="font-semibold text-slate-900">Tareo</span>
-              <span className="text-xs text-slate-500 hidden sm:inline">· Azoramind</span>
+              {brand.company_name && (
+                <span className="text-xs text-slate-500 hidden sm:inline">
+                  · {brand.company_name}
+                </span>
+              )}
             </div>
             <nav className="hidden sm:flex items-center gap-1">
               <NavLink to="/tareo" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>

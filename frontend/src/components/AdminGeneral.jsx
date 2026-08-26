@@ -1,6 +1,6 @@
 /**
  * Info del sistema — versión, estado de servicios, cliente, modo.
- * Read-only. Refleja la pantalla "General" del CRM Palma.
+ * Read-only. Copy amigable, sin exponer strings técnicos de infra.
  */
 import { useEffect, useState } from 'react'
 
@@ -9,7 +9,7 @@ import { configApi } from '../api/config'
 function StatusBadge({ up, label }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${
+      className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border whitespace-nowrap shrink-0 ${
         up
           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
           : 'bg-red-50 text-red-700 border-red-200'
@@ -19,6 +19,19 @@ function StatusBadge({ up, label }) {
       {label}
     </span>
   )
+}
+
+function formatBuildTime(iso) {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    return d.toLocaleString('es-PE', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })
+  } catch {
+    return iso
+  }
 }
 
 export default function AdminGeneral() {
@@ -51,19 +64,19 @@ export default function AdminGeneral() {
           <button onClick={load} className="btn-secondary text-xs">↻ Verificar</button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-          <div className="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
-            <div>
+          <div className="rounded-lg border border-slate-200 p-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <div className="text-sm font-medium text-slate-800">API Backend</div>
-              <div className="text-xs text-slate-500">{data.api_name}</div>
+              <div className="text-xs text-slate-500 truncate">Servidor de aplicaciones</div>
             </div>
-            <StatusBadge up={data.api_status === 'up'} label={data.api_status === 'up' ? 'Conectado' : 'Caído'} />
+            <StatusBadge up={data.api_status === 'up'} label={data.api_status === 'up' ? 'Operativo' : 'Caído'} />
           </div>
-          <div className="rounded-lg border border-slate-200 p-3 flex items-center justify-between">
-            <div>
+          <div className="rounded-lg border border-slate-200 p-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <div className="text-sm font-medium text-slate-800">Base de datos</div>
-              <div className="text-xs text-slate-500 truncate">{data.db_engine}</div>
+              <div className="text-xs text-slate-500 truncate">Almacén principal del sistema</div>
             </div>
-            <StatusBadge up={data.db_status === 'up'} label={data.db_status === 'up' ? 'Conectada' : 'Caída'} />
+            <StatusBadge up={data.db_status === 'up'} label={data.db_status === 'up' ? 'Operativa' : 'Caída'} />
           </div>
         </div>
       </div>
@@ -72,7 +85,7 @@ export default function AdminGeneral() {
         <h2 className="font-semibold text-slate-900 mb-3">Información del sistema</h2>
         <dl className="divide-y divide-slate-100">
           <Row label="Versión" value={data.version} />
-          <Row label="Build" value={data.build_time} />
+          <Row label="Actualizado" value={formatBuildTime(data.build_time)} />
           <Row label="Cliente" value={data.company_name} />
           <Row label="Ambiente" value={data.environment} />
           <Row label="Desarrollado por" value={`${data.developed_by} — www.azoramind.com`} />
