@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { adminApi } from '../api/admin'
+import { useAuthStore } from '../store/auth'
+import AdminCorreo from '../components/AdminCorreo.jsx'
 import AdminGeneral from '../components/AdminGeneral.jsx'
 import AdminMasterTable from '../components/AdminMasterTable.jsx'
 import AdminPermisos from '../components/AdminPermisos.jsx'
+import AdminSeguridad from '../components/AdminSeguridad.jsx'
 import AdminSettings from '../components/AdminSettings.jsx'
 import AdminSidebar from '../components/admin/AdminSidebar.jsx'
 import AdminTrabajadores from '../components/AdminTrabajadores.jsx'
@@ -11,16 +14,18 @@ import AdminUsuarios from '../components/AdminUsuarios.jsx'
 import { Icon } from '../components/admin/Icons.jsx'
 
 const TABS = [
-  { id: 'general',       label: 'General',           group: 'Empresa',   icon: Icon.General },
-  { id: 'marca',         label: 'Marca / Config',    group: 'Empresa',   icon: Icon.Brand },
-  { id: 'trabajadores',  label: 'Trabajadores',      group: 'Equipo',    icon: Icon.Users },
-  { id: 'usuarios',      label: 'Usuarios',          group: 'Equipo',    icon: Icon.Key },
-  { id: 'permisos',      label: 'Roles y permisos',  group: 'Equipo',    icon: Icon.Shield },
-  { id: 'categorias',    label: 'Categorías',        group: 'Catálogos', icon: Icon.Tag },
-  { id: 'proyectos',     label: 'Proyectos',         group: 'Catálogos', icon: Icon.Folder },
-  { id: 'areas',         label: 'Áreas',             group: 'Por proyecto', icon: Icon.Layers },
-  { id: 'especialidades',label: 'Especialidades',    group: 'Por proyecto', icon: Icon.Beaker },
-  { id: 'centros',       label: 'Centros de costo',  group: 'Por proyecto', icon: Icon.Building },
+  { id: 'general',       label: 'General',           group: 'Empresa',       icon: Icon.General },
+  { id: 'marca',         label: 'Marca / Config',    group: 'Empresa',       icon: Icon.Brand },
+  { id: 'trabajadores',  label: 'Trabajadores',      group: 'Equipo',        icon: Icon.Users },
+  { id: 'usuarios',      label: 'Usuarios',          group: 'Equipo',        icon: Icon.Key },
+  { id: 'permisos',      label: 'Roles y permisos',  group: 'Equipo',        icon: Icon.Shield },
+  { id: 'categorias',    label: 'Categorías',        group: 'Catálogos',     icon: Icon.Tag },
+  { id: 'proyectos',     label: 'Proyectos',         group: 'Catálogos',     icon: Icon.Folder },
+  { id: 'areas',         label: 'Áreas',             group: 'Por proyecto',  icon: Icon.Layers },
+  { id: 'especialidades',label: 'Especialidades',    group: 'Por proyecto',  icon: Icon.Beaker },
+  { id: 'centros',       label: 'Centros de costo',  group: 'Por proyecto',  icon: Icon.Building },
+  { id: 'correo',        label: 'Correo',            group: 'Comunicación',  icon: Icon.General },
+  { id: 'seguridad',     label: 'Seguridad',         group: 'Mi cuenta',     icon: Icon.Key },
 ]
 
 // Tabs cuyo contenido está anclado a un proyecto (usan el selector superior).
@@ -217,8 +222,24 @@ function ProyectoScopeBar({ proyectos, value, onChange }) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Tabs que solo puede ver un admin. Non-admin (supervisor/trabajador) solo
+// ven "Mi cuenta > Seguridad" para gestionar su propia contraseña.
+const ADMIN_ONLY_TABS = new Set([
+  'general', 'marca', 'trabajadores', 'usuarios', 'permisos',
+  'categorias', 'proyectos', 'areas', 'especialidades', 'centros', 'correo',
+])
+
 export default function Admin() {
-  const [tab, setTab] = useState('general')
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
+
+  // Tabs visibles según rol. Non-admin: solo "seguridad" (Mi cuenta).
+  const visibleTabs = useMemo(
+    () => (isAdmin ? TABS : TABS.filter((t) => !ADMIN_ONLY_TABS.has(t.id))),
+    [isAdmin],
+  )
+
+  const [tab, setTab] = useState(() => (isAdmin ? 'general' : 'seguridad'))
   const [proyectos, setProyectos] = useState([])
   const [scopeProyectoId, setScopeProyectoIdState] = useState(
     () => localStorage.getItem(SCOPE_STORAGE_KEY) || null,
@@ -271,7 +292,7 @@ export default function Admin() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6">
-        <AdminSidebar tabs={TABS} active={tab} onSelect={setTab} />
+        <AdminSidebar tabs={visibleTabs} active={tab} onSelect={setTab} />
 
         <section className="min-w-0 space-y-4">
           {/* Selector de proyecto: sólo visible en tabs por-proyecto */}
@@ -314,6 +335,8 @@ export default function Admin() {
               optionsAsyncArgs={[scopeProyectoId]}
             />
           )}
+          {tab === 'correo' && <AdminCorreo />}
+          {tab === 'seguridad' && <AdminSeguridad />}
         </section>
       </div>
     </div>

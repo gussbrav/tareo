@@ -143,16 +143,17 @@ export default function UserMenu() {
 
           <div className="border-t border-slate-100 mb-1" />
 
-          {isAdmin && (
-            <button
-              role="menuitem"
-              onClick={() => { navigate('/configuracion'); setOpen(false) }}
-              className="w-[calc(100%-8px)] mx-1 text-left px-3 py-2 text-[13px] flex items-center gap-2.5 rounded-lg transition-colors text-slate-700 hover:bg-slate-50"
-            >
-              <IconGear className="text-slate-400" />
-              Configuración
-            </button>
-          )}
+          {/* Todos los roles acceden a /configuracion. Admin ve toda la config;
+              supervisor/trabajador ven solo "Mi cuenta > Seguridad" para cambiar
+              su propia contraseña. Cambiamos el label según rol. */}
+          <button
+            role="menuitem"
+            onClick={() => { navigate('/configuracion'); setOpen(false) }}
+            className="w-[calc(100%-8px)] mx-1 text-left px-3 py-2 text-[13px] flex items-center gap-2.5 rounded-lg transition-colors text-slate-700 hover:bg-slate-50"
+          >
+            <IconGear className="text-slate-400" />
+            {isAdmin ? 'Configuración' : 'Mi cuenta'}
+          </button>
 
           <div className="border-t border-slate-100 my-1" />
 

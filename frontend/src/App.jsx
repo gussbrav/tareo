@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import Login from './pages/Login.jsx'
+import AceptarInvitacion from './pages/AceptarInvitacion.jsx'
 import Agenda from './pages/Agenda.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import NuevaActividad from './pages/NuevaActividad.jsx'
@@ -26,6 +27,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* Público: link enviado por email al invitar un usuario. */}
+      <Route path="/aceptar/:token" element={<AceptarInvitacion />} />
 
       <Route
         element={
@@ -46,10 +49,12 @@ export default function App() {
             </RequireAuth>
           }
         />
+        {/* /configuracion accesible por TODOS los roles autenticados — el sidebar
+            filtra qué tabs muestra según role. Non-admin solo ve "Mi cuenta > Seguridad". */}
         <Route
           path="/configuracion"
           element={
-            <RequireAuth roles={['admin']}>
+            <RequireAuth>
               <Admin />
             </RequireAuth>
           }
