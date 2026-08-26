@@ -182,7 +182,7 @@ export default function AdminTrabajadores() {
           title: 'Sin trabajadores',
           message: search
             ? 'No hay resultados para tu búsqueda.'
-            : 'Cargá al primer trabajador para empezar a asignar actividades.',
+            : 'Carga al primer trabajador para empezar a asignar actividades.',
           actionLabel: search ? undefined : 'Nuevo trabajador',
           onAction: search ? undefined : openNew,
         }}
@@ -216,7 +216,7 @@ export default function AdminTrabajadores() {
               ))}
             </select>
             <p className="text-xs text-slate-400 mt-1">
-              Si falta la categoría, agregala en la sección <strong>Categorías</strong>.
+              Si falta la categoría, agrégala en la sección <strong>Categorías</strong>.
             </p>
           </div>
           <div>
@@ -253,7 +253,7 @@ export default function AdminTrabajadores() {
         title="Desactivar trabajador"
         message={
           <>
-            ¿Seguro que querés desactivar a{' '}
+            ¿Seguro que quieres desactivar a{' '}
             <strong className="text-slate-900">{confirmingDelete?.nbrcompleto}</strong>?
             <br />
             <span className="text-slate-500">

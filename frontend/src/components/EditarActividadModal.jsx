@@ -98,7 +98,7 @@ export default function EditarActividadModal({ actividadId, onClose, onSaved, ca
         ) : confirmDelete ? (
           <div className="p-5 space-y-4">
             <p className="text-sm text-slate-800">
-              ¿Confirmás eliminar la actividad de <strong>{meta?.trabajador_nombre}</strong>? Esta acción no se puede deshacer.
+              ¿Confirmas eliminar la actividad de <strong>{meta?.trabajador_nombre}</strong>? Esta acción no se puede deshacer.
             </p>
             {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>}
             <div className="flex gap-2 justify-end">

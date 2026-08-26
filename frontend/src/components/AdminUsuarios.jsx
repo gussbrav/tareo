@@ -173,7 +173,7 @@ export default function AdminUsuarios() {
           title: 'Sin usuarios',
           message: search
             ? 'No hay resultados para tu búsqueda.'
-            : 'Creá el primer usuario para que puedan iniciar sesión.',
+            : 'Crea el primer usuario para que puedan iniciar sesión.',
           actionLabel: search ? undefined : 'Nuevo usuario',
           onAction: search ? undefined : openNew,
         }}
@@ -268,7 +268,7 @@ export default function AdminUsuarios() {
         title="Desactivar usuario"
         message={
           <>
-            ¿Seguro que querés desactivar el usuario{' '}
+            ¿Seguro que quieres desactivar el usuario{' '}
             <strong className="text-slate-900">{confirmingDelete?.email}</strong>?
             <br />
             <span className="text-slate-500">No podrá iniciar sesión hasta que lo reactives.</span>

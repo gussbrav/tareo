@@ -235,9 +235,9 @@ export default function AdminMasterTable({
           <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
             <Icon.Folder className="w-6 h-6" />
           </div>
-          <h3 className="mt-4 text-sm font-medium text-slate-900">Elegí un proyecto</h3>
+          <h3 className="mt-4 text-sm font-medium text-slate-900">Elige un proyecto</h3>
           <p className="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
-            {title} se maneja por proyecto. Seleccioná uno en el desplegable de arriba
+            {title} se maneja por proyecto. Selecciona uno en el desplegable de arriba
             para ver y gestionar sus {countLabel || title.toLowerCase()}.
           </p>
         </div>
@@ -261,10 +261,10 @@ export default function AdminMasterTable({
             empty={{
               title: `Sin ${countLabel || title.toLowerCase()}`,
               message: search
-                ? 'No hay resultados para tu búsqueda. Probá con otros términos.'
+                ? 'No hay resultados para tu búsqueda. Prueba con otros términos.'
                 : showCecoImporter
-                  ? `Podés importar el Excel de CECOs para cargar todo de una, o crear ${countLabel || title.toLowerCase()} uno por uno.`
-                  : `Todavía no tenés ${countLabel || title.toLowerCase()} cargados. Creá el primero para empezar.`,
+                  ? `Puedes importar el Excel de CECOs para cargar todo de una, o crear ${countLabel || title.toLowerCase()} uno por uno.`
+                  : `Todavía no tienes ${countLabel || title.toLowerCase()} cargados. Crea el primero para empezar.`,
               actionLabel: search ? undefined : `Nuevo ${singular}`,
               onAction: search ? undefined : openNew,
             }}
@@ -352,9 +352,9 @@ export default function AdminMasterTable({
         title={`Desactivar ${singular}`}
         message={
           <>
-            ¿Seguro que querés desactivar <strong className="text-slate-900">"{confirmingDelete && labelOf(confirmingDelete)}"</strong>?
+            ¿Seguro que quieres desactivar <strong className="text-slate-900">"{confirmingDelete && labelOf(confirmingDelete)}"</strong>?
             <br />
-            <span className="text-slate-500">Podés reactivarlo desde la lista.</span>
+            <span className="text-slate-500">Puedes reactivarlo desde la lista.</span>
           </>
         }
         confirmLabel="Desactivar"

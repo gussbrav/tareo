@@ -166,7 +166,7 @@ export default function NuevaActividad() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Nueva actividad</h1>
           <p className="text-slate-500 text-sm mt-1">
-            Registrá una tarea y asignala a uno o más trabajadores.
+            Registra una tarea y asígnala a uno o más trabajadores.
           </p>
         </div>
         <button className="btn-ghost btn-sm" onClick={() => navigate('/tareo')}>
@@ -181,7 +181,7 @@ export default function NuevaActividad() {
           <SectionHeader
             step={1}
             title="Selección de fecha y trabajo"
-            subtitle="Elegí día, proyecto y estructura contable."
+            subtitle="Elige día, proyecto y estructura contable."
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -211,7 +211,7 @@ export default function NuevaActividad() {
               >
                 <option value="">
                   {!proyectoId
-                    ? 'Elegí un proyecto primero'
+                    ? 'Elige un proyecto primero'
                     : areas.length === 0
                       ? 'Este proyecto no tiene áreas'
                       : 'Selecciona…'}
@@ -224,8 +224,8 @@ export default function NuevaActividad() {
               </select>
               {proyectoId && areas.length === 0 && (
                 <p className="text-xs text-amber-600 mt-1">
-                  Cargá las áreas de este proyecto desde <strong>Configuración → Áreas</strong>
-                  {' '}(o importalas del Excel).
+                  Carga las áreas de este proyecto desde <strong>Configuración → Áreas</strong>
+                  {' '}(o impórtalas del Excel).
                 </p>
               )}
             </div>
@@ -238,7 +238,7 @@ export default function NuevaActividad() {
                 required
                 disabled={!areaId}
               >
-                <option value="">{areaId ? 'Selecciona…' : 'Elegí un área primero'}</option>
+                <option value="">{areaId ? 'Selecciona…' : 'Elige un área primero'}</option>
                 {especialidades.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.display_name}
@@ -255,7 +255,7 @@ export default function NuevaActividad() {
                 required
                 disabled={!especialidadId}
               >
-                <option value="">{especialidadId ? 'Selecciona…' : 'Elegí una especialidad primero'}</option>
+                <option value="">{especialidadId ? 'Selecciona…' : 'Elige una especialidad primero'}</option>
                 {centrosCosto.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.display_name}
@@ -271,7 +271,7 @@ export default function NuevaActividad() {
           <SectionHeader
             step={2}
             title="Registro de actividad"
-            subtitle="Describí la tarea y elegí quiénes la ejecutan."
+            subtitle="Describe la tarea y elige quiénes la ejecutan."
           />
 
           <div>
@@ -280,7 +280,7 @@ export default function NuevaActividad() {
               className="input min-h-[96px] resize-y"
               value={desactividad}
               onChange={(e) => setDesactividad(e.target.value)}
-              placeholder="Describí la tarea a realizar…"
+              placeholder="Describe la tarea a realizar…"
               required
             />
           </div>
@@ -376,7 +376,7 @@ export default function NuevaActividad() {
           <p className="text-xs text-slate-500 hidden sm:block">
             {canSubmit
               ? 'Todo listo para crear la actividad.'
-              : 'Completá los campos obligatorios para continuar.'}
+              : 'Completa los campos obligatorios para continuar.'}
           </p>
           <div className="flex gap-2 ml-auto">
             <button type="button" className="btn-secondary btn-sm" onClick={() => navigate('/tareo')}>

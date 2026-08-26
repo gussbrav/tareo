@@ -190,7 +190,7 @@ function ProyectoScopeBar({ proyectos, value, onChange }) {
         onChange={(e) => onChange(e.target.value || null)}
         className="input input-sm flex-1 min-w-[220px] max-w-[420px]"
       >
-        <option value="">— Elegí un proyecto —</option>
+        <option value="">— Elige un proyecto —</option>
         {proyectos.map((p) => (
           <option key={p.id} value={p.id}>
             {p.descontratoproyecto ? `${p.descontratoproyecto} · ` : ''}

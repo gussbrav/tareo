@@ -38,7 +38,7 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (err) {
-      setError('No se pudo descargar el template. Reintentá en un momento.')
+      setError('No se pudo descargar el template. Reinténtalo en un momento.')
     } finally {
       setDownloadingTemplate(false)
     }
@@ -113,8 +113,8 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-slate-800">¿Primera vez?</p>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Descargá el template con headers, ejemplos y guía de campos.
-                  Llenalo con tus datos y volvé a subirlo.
+                  Descarga el template con headers, ejemplos y guía de campos.
+                  Llénalo con tus datos y vuelve a subirlo.
                 </p>
               </div>
               <button
@@ -130,10 +130,10 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
 
             <div className="rounded-lg border border-dashed border-slate-300 p-6 text-center">
               <Icon.Layers className="w-8 h-8 mx-auto text-slate-400" />
-              <p className="mt-2 text-sm font-medium text-slate-700">Subí el Excel de CECOs</p>
+              <p className="mt-2 text-sm font-medium text-slate-700">Sube el Excel de CECOs</p>
               <p className="text-xs text-slate-500 mt-1">
                 Columnas esperadas: Cod01, Area, Cod02, Especialidad, Cod03, CentroCosto (obligatorias).
-                TipoCosto, CodigoCeco, CecoPalma, Descripcion (opcionales).
+                TipoCosto, CodigoCeco, Descripcion (opcionales).
               </p>
               <p className="text-xs text-slate-400 mt-2">Máximo {MAX_MB} MB · .xlsx / .xls</p>
               <button

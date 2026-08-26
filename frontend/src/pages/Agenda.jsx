@@ -276,9 +276,12 @@ function MonthView({ year, month, itemsByDay, selectedDay, setSelectedDay, today
 
 // ─── VIEW: Semana (time-grid estilo Google Calendar) ──────────────────────
 
+// Rango completo 24hs (0 = 12 AM, 23 = 11 PM). Al montar la vista se
+// auto-scrollea a la hora actual, por lo que el usuario no ve las 12 AM
+// primero — solo el rango relevante.
 const HOUR_HEIGHT = 44 // px por hora
-const START_HOUR = 6
-const END_HOUR = 22
+const START_HOUR = 0
+const END_HOUR = 23
 const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i)
 
 function nowMinutesLocal() {
@@ -357,15 +360,14 @@ function WeekView({ anchor, itemsByDay, today, groupBy, onOpen }) {
   //   - al montar la vista (switch a Semana)
   //   - al cambiar de semana (prev/next)
   // Regla: si hoy está en la semana visible → scroll a "ahora - 1.5h" de
-  // contexto. Sino → 8 AM. Usa nowMinutesLocal() para leer el reloj al
+  // contexto. Si no → 8 AM. Usa nowMinutesLocal() para leer el reloj al
   // momento de scrollear (no depende de nowMin state para no re-scrollear
   // cada minuto).
   useEffect(() => {
     if (!scrollRef.current) return
     const now = nowMinutesLocal()
     const todayInWeek = week.some((d) => isoOf(d) === today.iso)
-    const inRange = now >= START_HOUR * 60 && now <= END_HOUR * 60
-    const targetMin = (todayInWeek && inRange)
+    const targetMin = todayInWeek
       ? Math.max(0, now - START_HOUR * 60 - 90)  // ahora con 1.5h de contexto
       : (8 - START_HOUR) * 60                     // 8 AM por default
     scrollRef.current.scrollTop = (targetMin / 60) * HOUR_HEIGHT
@@ -374,8 +376,9 @@ function WeekView({ anchor, itemsByDay, today, groupBy, onOpen }) {
 
   const totalHeight = HOURS.length * HOUR_HEIGHT
 
-  const nowVisible = nowMin >= START_HOUR * 60 && nowMin <= END_HOUR * 60
-  const nowTop = nowVisible ? ((nowMin - START_HOUR * 60) / 60) * HOUR_HEIGHT : 0
+  // Con rango completo 24hs, la línea "ahora" siempre está en el grid.
+  const nowVisible = true
+  const nowTop = ((nowMin - START_HOUR * 60) / 60) * HOUR_HEIGHT
 
   return (
     <div className="card-flush h-full flex flex-col overflow-hidden">

@@ -142,7 +142,7 @@ export default function AdminPermisos() {
         <p className="text-sm text-slate-500">
           Los cambios se aplican en tiempo real. El backend recibe cada toggle y actualiza la
           matriz en <code className="text-xs bg-slate-100 px-1 rounded">auth.role_permissions</code>.
-          Nada está hardcodeado — podés desactivar una capability para un rol y su UI + endpoint
+          Nada está hardcodeado — puedes desactivar una capability para un rol y su UI + endpoint
           responderán 403 al instante (con TTL de cache de 60s).
         </p>
         <div className="flex flex-wrap gap-2 mt-3">
@@ -202,11 +202,11 @@ export default function AdminPermisos() {
       ))}
 
       <div className="card bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-        <p><strong>Cómo funciona:</strong> el backend cachea la matriz por 60s. Un cambio acá
+        <p><strong>Cómo funciona:</strong> el backend cachea la matriz por 60s. Un cambio aquí
           invalida el cache al instante. Al siguiente request, el guard <code>require_permission()</code>
           consulta la matriz actualizada.</p>
         <p><strong>Encoding en UI:</strong> las páginas usan <code>/api/config/my-permissions</code> al login
-          para saber qué renderizar. Si desactivás una capability para un rol, ese usuario debe hacer
+          para saber qué renderizar. Si desactivas una capability para un rol, ese usuario debe hacer
           logout/login para que la UI se actualice.</p>
       </div>
     </div>

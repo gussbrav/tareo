@@ -30,7 +30,6 @@ COL_ALIASES = {
     "cc":           ["centrocosto", "centro_costo", "nombre_cc", "nbrcentrocosto", "cc"],
     "tipocosto":    ["tipocosto", "tipo_costo", "tipo"],
     "codigoceco":   ["codigoceco", "codigo_ceco", "cec_final", "ceco"],
-    "cecopalma":    ["cecopalma", "ceco_palma"],
     "descripcion":  ["descripcion", "descentrocosto", "desc"],
 }
 
@@ -116,21 +115,35 @@ def parse_ceco_workbook(file_bytes: bytes) -> Dict[str, Any]:
 
     col_map = _build_col_map(header_row)
 
-    # Columnas mínimas obligatorias
+    # ── Validación 1: columnas obligatorias presentes ──────────────────────
     required = ["cod01", "area", "cod03", "cc"]
     missing = [r for r in required if r not in col_map]
     if missing:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             f"Faltan columnas obligatorias en el Excel: {', '.join(missing)}. "
-            f"Columnas encontradas: {list(header_row)}"
+            f"Se encontraron: {[h for h in header_row if h]}"
         )
 
-    warnings = []
+    # Límites de negocio (parametrizables si hace falta)
+    MAX_ROWS = 5000
+    MAX_NAME_LEN = 255
+    MAX_COD_LEN = 30
+
+    # ── Validación 2: parseo fila-por-fila con errores/warnings ───────────
+    errors: list[str] = []   # bloqueantes — abortar
+    warnings: list[str] = [] # informativos — se saltea la fila
     parsed_rows = []
+
+    # Para chequeo de consistencia cruzada (mismo código, distintos nombres)
+    area_names_by_cod: dict[int, str] = {}
+    esp_names_by_key: dict[tuple, str] = {}
+    seen_cc_keys: set[tuple] = set()  # (cod01, cod02, cod03) — dup detection
+
     for i, row in enumerate(rows_iter, start=2):
         if row is None or all(v is None or v == "" for v in row):
-            continue  # skip empty
+            continue  # skip completely empty
+
         cod01 = _int_or_none(_get(row, col_map, "cod01"))
         area = _str_or_none(_get(row, col_map, "area"))
         cod02 = _int_or_none(_get(row, col_map, "cod02"))
@@ -139,21 +152,80 @@ def parse_ceco_workbook(file_bytes: bytes) -> Dict[str, Any]:
         cc = _str_or_none(_get(row, col_map, "cc"))
         tipocosto = _str_or_none(_get(row, col_map, "tipocosto"))
         codigoceco = _str_or_none(_get(row, col_map, "codigoceco"))
-        cecopalma = _str_or_none(_get(row, col_map, "cecopalma"))
         descripcion = _str_or_none(_get(row, col_map, "descripcion"))
 
-        if cod01 is None or not area:
-            warnings.append(f"Fila {i}: sin Cod01/Área — salteada")
+        # 2.a Obligatorios presentes
+        if cod01 is None:
+            warnings.append(f"Fila {i}: Cod01 vacío o no numérico — saltada")
             continue
-        if cod03 is None or not cc:
-            warnings.append(f"Fila {i}: sin Cod03/CC — salteada")
+        if not area:
+            warnings.append(f"Fila {i}: Area vacía — saltada")
+            continue
+        if cod03 is None:
+            warnings.append(f"Fila {i}: Cod03 vacío o no numérico — saltada")
+            continue
+        if not cc:
+            warnings.append(f"Fila {i}: CentroCosto vacío — saltada")
             continue
 
-        # Si no hay especialidad, se usa una default "GENERAL" con cod02=0
+        # 2.b Rangos de valores numéricos
+        if cod01 < 0 or cod01 > 999999:
+            warnings.append(f"Fila {i}: Cod01={cod01} fuera de rango (0–999999) — saltada")
+            continue
+        if cod03 < 0 or cod03 > 999999:
+            warnings.append(f"Fila {i}: Cod03={cod03} fuera de rango (0–999999) — saltada")
+            continue
+
+        # 2.c Longitud de strings
+        if len(area) > MAX_NAME_LEN:
+            warnings.append(f"Fila {i}: Area supera {MAX_NAME_LEN} caracteres — saltada")
+            continue
+        if len(cc) > MAX_NAME_LEN:
+            warnings.append(f"Fila {i}: CentroCosto supera {MAX_NAME_LEN} caracteres — saltada")
+            continue
+        if esp and len(esp) > MAX_NAME_LEN:
+            warnings.append(f"Fila {i}: Especialidad supera {MAX_NAME_LEN} caracteres — saltada")
+            continue
+        if codigoceco and len(codigoceco) > MAX_COD_LEN:
+            warnings.append(f"Fila {i}: CodigoCeco supera {MAX_COD_LEN} caracteres — saltada")
+            continue
+
+        # Default especialidad si vino vacía
         if cod02 is None:
             cod02 = 0
         if not esp:
             esp = "GENERAL"
+
+        # 2.d Consistencia cruzada: mismo Cod01 → mismo nombre de Area
+        prev_area = area_names_by_cod.get(cod01)
+        if prev_area is None:
+            area_names_by_cod[cod01] = area
+        elif prev_area.strip().lower() != area.strip().lower():
+            warnings.append(
+                f"Fila {i}: Cod01={cod01} ya se usó con el nombre '{prev_area}'; "
+                f"aquí dice '{area}'. Se usará el primero — corrige el Excel para evitar ambigüedad."
+            )
+
+        # (Cod01, Cod02) → mismo nombre de Especialidad
+        esp_key = (cod01, cod02)
+        prev_esp = esp_names_by_key.get(esp_key)
+        if prev_esp is None:
+            esp_names_by_key[esp_key] = esp
+        elif prev_esp.strip().lower() != esp.strip().lower():
+            warnings.append(
+                f"Fila {i}: Cod01={cod01}, Cod02={cod02} ya se usó como '{prev_esp}'; "
+                f"aquí dice '{esp}'. Se usará el primero."
+            )
+
+        # 2.e Duplicados exactos de CC dentro del mismo Excel
+        cc_key = (cod01, cod02, cod03)
+        if cc_key in seen_cc_keys:
+            warnings.append(
+                f"Fila {i}: CC duplicado (Cod01={cod01}, Cod02={cod02}, Cod03={cod03}). "
+                f"Se usará la primera aparición."
+            )
+            continue
+        seen_cc_keys.add(cc_key)
 
         parsed_rows.append({
             "cod01": cod01,
@@ -164,10 +236,32 @@ def parse_ceco_workbook(file_bytes: bytes) -> Dict[str, Any]:
             "cc": cc,
             "tipocosto": tipocosto,
             "codigoceco": codigoceco,
-            "cecopalma": cecopalma,
             "descripcion": descripcion,
             "_source_row": i,
         })
+
+        # 2.f Límite duro de filas — abortar antes de saturar
+        if len(parsed_rows) > MAX_ROWS:
+            errors.append(
+                f"El archivo supera el máximo de {MAX_ROWS} filas válidas. "
+                f"Divídelo en partes más chicas o contacta a soporte."
+            )
+            break
+
+    # ── Validación 3: al menos 1 fila válida ──────────────────────────────
+    if not parsed_rows and not errors:
+        errors.append(
+            "Ninguna fila del Excel pasó las validaciones. "
+            "Revisa que las columnas obligatorias (Cod01, Area, Cod03, CentroCosto) "
+            "tengan valores en todas las filas."
+        )
+
+    # Si hay errores bloqueantes, abortar con detalle
+    if errors:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Excel rechazado: " + " | ".join(errors)
+        )
 
     return {
         "columns_found": col_map,
@@ -197,7 +291,7 @@ def build_template_xlsx() -> bytes:
         "Cod01", "Area",
         "Cod02", "Especialidad",
         "Cod03", "CentroCosto",
-        "TipoCosto", "CodigoCeco", "CecoPalma", "Descripcion",
+        "TipoCosto", "CodigoCeco", "Descripcion",
     ]
     ws.append(headers)
 
@@ -216,19 +310,19 @@ def build_template_xlsx() -> bytes:
     # los 4 CC típicos (Mano de Obra / Materiales / Equipos / Subcontratos).
     # Muestra el patrón de códigos que el usuario debe replicar.
     examples = [
-        # (cod01, area, cod02, esp, cod03, cc, tipocosto, codigoceco, cecopalma, desc)
-        (22, "Trabajos y Obras Preliminares", 11, "Vias de Acceso",         1, "Mano de Obra",          "Costo Directo Inc. IGV", "221101", "P00409", ""),
-        (22, "Trabajos y Obras Preliminares", 11, "Vias de Acceso",         2, "Materiales",            "Costo Directo Inc. IGV", "221102", "P00409", ""),
-        (22, "Trabajos y Obras Preliminares", 11, "Vias de Acceso",         3, "Equipos y Herramientas","Costo Directo Inc. IGV", "221103", "P00409", ""),
-        (22, "Trabajos y Obras Preliminares", 13, "Trabajos Preliminares",  1, "Mano de Obra",          "Costo Directo Inc. IGV", "221301", "P00409", ""),
-        (23, "Obras Iniciales",               10, "Cerco Perimetrico",      1, "Mano de Obra",          "Costo Directo Inc. IGV", "231001", "P00401", "Ejemplo de descripción"),
-        (23, "Obras Iniciales",               10, "Cerco Perimetrico",      2, "Materiales",            "Costo Directo Inc. IGV", "231002", "P00401", ""),
+        # (cod01, area, cod02, esp, cod03, cc, tipocosto, codigoceco, desc)
+        (22, "Trabajos y Obras Preliminares", 11, "Vías de Acceso",         1, "Mano de Obra",          "Costo Directo Inc. IGV", "221101", ""),
+        (22, "Trabajos y Obras Preliminares", 11, "Vías de Acceso",         2, "Materiales",            "Costo Directo Inc. IGV", "221102", ""),
+        (22, "Trabajos y Obras Preliminares", 11, "Vías de Acceso",         3, "Equipos y Herramientas","Costo Directo Inc. IGV", "221103", ""),
+        (22, "Trabajos y Obras Preliminares", 13, "Trabajos Preliminares",  1, "Mano de Obra",          "Costo Directo Inc. IGV", "221301", ""),
+        (23, "Obras Iniciales",               10, "Cerco Perimétrico",      1, "Mano de Obra",          "Costo Directo Inc. IGV", "231001", "Ejemplo de descripción"),
+        (23, "Obras Iniciales",               10, "Cerco Perimétrico",      2, "Materiales",            "Costo Directo Inc. IGV", "231002", ""),
     ]
     for row in examples:
         ws.append(row)
 
     # Ancho de columnas
-    widths = [7, 32, 7, 30, 7, 26, 22, 12, 10, 30]
+    widths = [7, 32, 7, 30, 7, 26, 22, 12, 30]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -251,13 +345,12 @@ def build_template_xlsx() -> bytes:
         ["  Especialidad", "Nombre de la especialidad (default: GENERAL)"],
         ["  TipoCosto", "ej: Costo Directo Inc. IGV, Indirecto, Gastos Generales"],
         ["  CodigoCeco", "Código concatenado del CC (ej: 221101)"],
-        ["  CecoPalma", "Código alterno (opcional)"],
         ["  Descripcion", "Detalle libre (opcional)"],
         [""],
         ["Reglas:"],
-        ["  · Los códigos se scopean por proyecto. Podés usar 'Cod01=10' en 2 proyectos"],
+        ["  · Los códigos se manejan por proyecto. Puedes usar 'Cod01=10' en 2 proyectos"],
         ["    distintos con significados diferentes."],
-        ["  · La importación es idempotente: si volvés a subir el mismo Excel, actualiza"],
+        ["  · La importación es idempotente: si vuelves a subir el mismo Excel, actualiza"],
         ["    los existentes y no duplica."],
         ["  · Se identifican por códigos: (proyecto, Cod01) para áreas,"],
         ["    (Área, Cod02) para especialidades, (Especialidad, Cod03) para CC."],
@@ -374,12 +467,11 @@ def import_to_proyecto(proyecto_id: UUID, parsed: Dict[str, Any]) -> Dict[str, A
                            nbrcentrocosto = %s,
                            tipocentrocosto = COALESCE(%s, tipocentrocosto),
                            codigo_ceco = COALESCE(%s, codigo_ceco),
-                           ceco_palma = COALESCE(%s, ceco_palma),
                            descentrocosto = COALESCE(%s, descentrocosto)
                      WHERE id = %s;
                     """,
                     (r["cc"], r["tipocosto"], r["codigoceco"],
-                     r["cecopalma"], r["descripcion"], existing["id"]),
+                     r["descripcion"], existing["id"]),
                 )
                 counters["centros_costo"]["updated"] += 1
             else:
@@ -387,11 +479,11 @@ def import_to_proyecto(proyecto_id: UUID, parsed: Dict[str, Any]) -> Dict[str, A
                     """
                     INSERT INTO construccion.m_centrocosto
                         (especialidad_id, codcentrocosto, nbrcentrocosto,
-                         tipocentrocosto, codigo_ceco, ceco_palma, descentrocosto)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s);
+                         tipocentrocosto, codigo_ceco, descentrocosto)
+                    VALUES (%s, %s, %s, %s, %s, %s);
                     """,
                     (esp_id, codcc, r["cc"], r["tipocosto"], r["codigoceco"],
-                     r["cecopalma"], r["descripcion"]),
+                     r["descripcion"]),
                 )
                 counters["centros_costo"]["inserted"] += 1
             counters["centros_costo"]["total"] += 1
