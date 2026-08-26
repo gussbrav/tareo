@@ -86,16 +86,19 @@
     margin-bottom: 60mm;
   }
   .cover-logo {
-    width: 44px;
-    height: 44px;
-    background: var(--gold);
-    border-radius: 8px;
+    width: 52px;
+    height: 52px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 800;
-    color: var(--brand-900);
-    font-size: 22px;
+    overflow: hidden;
+    background: white;
+  }
+  .cover-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
   .cover-brand-name { font-size: 14pt; font-weight: 600; letter-spacing: 0.02em; }
   .cover-brand-tag { font-size: 9pt; color: rgba(255,255,255,0.6); margin-top: 2px; }
@@ -438,7 +441,7 @@
   <div class="cover-decoration"></div>
   <div class="cover-hero">
     <div class="cover-brand">
-      <div class="cover-logo">A</div>
+      <div class="cover-logo"><img src="img/logazoramind.png" alt="Azoramind"></div>
       <div>
         <div class="cover-brand-name">Azoramind</div>
       </div>
