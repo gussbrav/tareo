@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { api } from '../api/client'
 import { useAuthStore } from '../store/auth'
+import { useActiveProjectStore } from '../store/project'
 
 function IconGear(props) {
   return (
@@ -89,6 +90,8 @@ export default function UserMenu() {
       /* ignore */
     }
     logout()
+    // Limpiar proyecto activo — evita que el próximo user vea el proyecto del anterior.
+    useActiveProjectStore.getState().clearActiveProject()
     navigate('/login', { replace: true })
   }
 

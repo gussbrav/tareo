@@ -7,6 +7,7 @@ import DateField from '../components/admin/DateField.jsx'
 import { Icon } from '../components/admin/Icons.jsx'
 import SearchableSelect from '../components/admin/SearchableSelect.jsx'
 import { today } from '../lib/format'
+import { useActiveProjectStore } from '../store/project'
 
 function initials(name) {
   if (!name) return '??'
@@ -32,7 +33,20 @@ export default function NuevaActividad() {
   const [trabajadores, setTrabajadores] = useState([])
   const [searchWorker, setSearchWorker] = useState('')
 
-  const [proyectoId, setProyectoId] = useState('')
+  // Prefill inicial del proyecto: si el user tiene un "proyecto activo"
+  // elegido en el topbar (ActiveProjectPicker), lo respetamos. Sino, se
+  // seleccionará el primero de la lista al cargar (ver useEffect abajo).
+  const activeProjectId = useActiveProjectStore((s) => s.activeProjectId)
+  const setActiveProjectId = useActiveProjectStore((s) => s.setActiveProjectId)
+  const [proyectoId, setProyectoIdState] = useState(activeProjectId || '')
+
+  // Wrapper — al cambiar el proyecto acá, actualizar también el store
+  // para que el switcher del topbar se mantenga sincronizado.
+  const setProyectoId = (id) => {
+    setProyectoIdState(id)
+    setActiveProjectId(id)
+  }
+
   const [areaId, setAreaId] = useState('')
   const [especialidadId, setEspecialidadId] = useState('')
   const [centroCostoId, setCentroCostoId] = useState('')
@@ -43,12 +57,19 @@ export default function NuevaActividad() {
   const [ok, setOk] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // Carga proyectos al inicio
+  // Carga proyectos al inicio. Preferencia de selección inicial:
+  //  1. activeProjectId del store (elegido en el topbar), si el user tiene acceso
+  //  2. primer proyecto de la lista (fallback)
   useEffect(() => {
     catalogosApi.proyectos()
       .then((prs) => {
         setProyectos(prs)
-        if (prs.length && !proyectoId) setProyectoId(prs[0].id)
+        if (proyectoId) return  // ya está prefill del store, no pisar
+        if (!prs.length) return
+        const preferred = activeProjectId && prs.some((p) => p.id === activeProjectId)
+          ? activeProjectId
+          : prs[0].id
+        setProyectoId(preferred)
       })
       .catch(() => setError('No se pudieron cargar los proyectos'))
   }, []) // eslint-disable-line

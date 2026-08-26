@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 import { useAuthStore } from '../store/auth'
 import { configApi } from '../api/config'
+import ActiveProjectPicker from './ActiveProjectPicker.jsx'
 import { Icon } from './admin/Icons.jsx'
 import UserMenu from './UserMenu.jsx'
 
@@ -64,6 +65,8 @@ export default function AppShell() {
                 Agenda
               </NavLink>
             </nav>
+            {/* Picker de proyecto activo — solo se muestra si el user tiene 2+ */}
+            <ActiveProjectPicker />
           </div>
 
           {/* Right: CTA + user menu */}

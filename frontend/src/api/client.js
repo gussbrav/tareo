@@ -1,6 +1,14 @@
 import axios from 'axios'
 
 import { useAuthStore } from '../store/auth'
+import { useActiveProjectStore } from '../store/project'
+
+// Helper: al forzar logout (por 401), también limpiamos el proyecto activo
+// para que el próximo usuario no herede el contexto del anterior.
+function forceLogout() {
+  useAuthStore.getState().logout()
+  useActiveProjectStore.getState().clearActiveProject()
+}
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -28,9 +36,9 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    const { refreshToken, setTokens, logout } = useAuthStore.getState()
+    const { refreshToken, setTokens } = useAuthStore.getState()
     if (!refreshToken) {
-      logout()
+      forceLogout()
       return Promise.reject(error)
     }
 
@@ -42,7 +50,7 @@ api.interceptors.response.use(
       original.headers.Authorization = `Bearer ${data.access_token}`
       return api(original)
     } catch (e) {
-      logout()
+      forceLogout()
       return Promise.reject(e)
     } finally {
       refreshing = null
