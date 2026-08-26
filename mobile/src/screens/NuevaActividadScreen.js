@@ -232,17 +232,29 @@ export default function NuevaActividadScreen({ navigation }) {
       })
       Alert.alert('Actividad creada', `Se crearon ${res.created} actividad(es).`, [
         {
-          text: 'Volver al tareo',
+          text: 'Ir al tareo',
           onPress: () => {
-            if (navigation.canGoBack()) navigation.goBack()
-            else navigation.navigate('TareoStack')
+            // Navegación cross-tab: parent es el Tab.Navigator. Salta al
+            // tab 'Tareo' (antes navegaba a TareoStack inexistente y
+            // aterrizaba en el Home por default).
+            const parent = navigation.getParent?.()
+            if (parent) parent.navigate('Tareo')
+            else if (navigation.canGoBack()) navigation.goBack()
           },
         },
         {
           text: 'Crear otra',
           onPress: () => {
+            // Limpieza total — el user elige todo desde cero. La fecha
+            // queda (uso típico: registrar varias del mismo día).
+            setProyectoId(proyectos[0]?.id || null)
+            setAreaId(null)
+            setEspecialidadId(null)
+            setCentroCostoId(null)
             setDesactividad('')
             setSelectedTrabajadores([])
+            // Refrescamos trabajadores disponibles — el backend excluye
+            // los que ya tienen tarea en esta fecha.
             catalogosApi.trabajadoresDisponibles(fecha).then(setTrabajadores)
           },
         },

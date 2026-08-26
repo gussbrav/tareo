@@ -6,21 +6,27 @@
  */
 
 export const colors = {
-  // ── Primary (azul Azoramind) ──
+  // ── Primary (azul Azoramind refinado — más vivo, mantiene identidad)
+  // brand.600 antes era #1E40AF (blue-800), muy oscuro/apagado en
+  // superficies mobile. Se sube a #2563EB (blue-600) para más
+  // presencia visual sin perder la escalera azul. Contraste sobre
+  // blanco: 5.9:1 (WCAG AA cumplido para textos ≥ 14 pt bold).
   brand: {
     50:  '#EFF6FF',
     100: '#DBEAFE',
     200: '#BFDBFE',
-    500: '#2563EB',
-    600: '#1E40AF',  // primary — 8.6:1 sobre blanco
-    700: '#1E3A8A',
+    500: '#3B82F6',  // azul claro vivo
+    600: '#2563EB',  // primary — CTAs, tabs, FAB
+    700: '#1D4ED8',  // texto sobre brand[50], hover
   },
 
-  // ── Accent (dorado Azoramind) ──
+  // ── Accent (amber vibrante — reemplaza el dorado muerto D4AF37)
   accent: {
+    50:  '#FFFBEB',
     100: '#FEF3C7',
-    500: '#D4AF37',
-    700: '#92671A',
+    500: '#F59E0B',
+    600: '#D97706',
+    700: '#B45309',
   },
 
   // ── Semantic ──
@@ -37,11 +43,11 @@ export const colors = {
   borderStrong: '#CBD5E1',
 
   text: {
-    primary:   '#0F172A',  // 17:1  — títulos, números KPI
-    secondary: '#475569',  // 7.5:1 — body
-    tertiary:  '#64748B',  // 5.7:1 — captions
+    primary:   '#0F172A',  // 19:1 — títulos, números KPI
+    secondary: '#334155',  // 10.4:1 — body (más contraste que antes)
+    tertiary:  '#475569',  // 7.5:1 — captions con presencia
     muted:     '#94A3B8',  // 3.5:1 — solo texto grande o disabled
-    softMuted: '#B4C2D6',  // pastel-ish — tabs inactivos, chevrons, hairlines
+    softMuted: '#94A3B8',  // tabs inactivos, chevrons (más definido)
     inverse:   '#FFFFFF',
   },
 
@@ -91,28 +97,29 @@ export const radius = {
   sm: 8, md: 12, lg: 16, xl: 20, pill: 999,
 }
 
-// ── Sombras (elevation Android + shadow iOS) ──
+// ── Sombras premium — tint azul sutil en vez de gris neutro
+// (patrón Linear/Notion: sombras con la luz de la marca, no muertas)
 export const shadow = {
   card: {
-    shadowColor: '#0F172A',
+    shadowColor: '#1E293B',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
   },
   floating: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
+    shadowColor: '#1E40AF',      // tint azul brand para el FAB
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 16,
+    elevation: 10,
   },
   tabBar: {
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.05,
     shadowRadius: 12,
-    elevation: 10,
+    elevation: 8,
   },
 }
 

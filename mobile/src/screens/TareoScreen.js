@@ -338,7 +338,7 @@ export default function TareoScreen({ navigation }) {
               styles.selectAllInlineText,
               iniciadasVisibles.length === 0 && { color: colors.text.muted },
             ]}>
-              Seleccionar todos
+              Seleccionar iniciadas
             </Text>
           </Pressable>
 

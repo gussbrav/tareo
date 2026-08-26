@@ -16,6 +16,11 @@ const PATHS = {
     'M3 11l9-8 9 8',
     'M5 9.5V19a2 2 0 0 0 2 2h3v-6h4v6h3a2 2 0 0 0 2-2V9.5',
   ],
+  // Versión filled: casa sólida con puerta interior blanca (indica hueco).
+  // Para uso en tab activo — más presencia visual (patrón iOS/Instagram).
+  homeFilled: [
+    'M12 3L2 12h3v8a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-8h3L12 3z',
+  ],
   list: [
     // Checklist de 3 items con checks a la izquierda — comunica "actividades"
     'M4.5 6.5l1.5 1.5 3-3',
@@ -24,6 +29,15 @@ const PATHS = {
     'M13 7h8',
     'M13 13h8',
     'M13 19h8',
+  ],
+  listFilled: [
+    // Fondos cuadrados sólidos de las 3 marcas + líneas de texto
+    'M3 5h6v6H3z',
+    'M3 14h6v6H3z',
+    'M12 6h9',
+    'M12 8h6',
+    'M12 15h9',
+    'M12 17h6',
   ],
   plus: [
     'M12 5v14',
@@ -39,8 +53,20 @@ const PATHS = {
     'M12.5 15.5h.01',
     'M16.5 15.5h.01',
   ],
+  calendarFilled: [
+    // Body sólido + top con dos "orejitas" de tick + banda blanca del header
+    'M6 4h12a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+    'M4 10h16', 'M8 3v4', 'M16 3v4',
+  ],
   layoutGrid: [
     // 2x2 grid — patrón "más opciones / app drawer" tipo iOS Home
+    'M4 4h6v6H4z',
+    'M14 4h6v6h-6z',
+    'M14 14h6v6h-6z',
+    'M4 14h6v6H4z',
+  ],
+  layoutGridFilled: [
+    // Mismos 4 cuadros pero fill: color (sin trazos internos)
     'M4 4h6v6H4z',
     'M14 4h6v6h-6z',
     'M14 14h6v6h-6z',

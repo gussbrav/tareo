@@ -2,7 +2,7 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Animated, Pressable, StyleSheet, View } from 'react-native'
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import AgendaScreen from './src/screens/AgendaScreen'
@@ -22,25 +22,30 @@ const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
 
 // ─── Icono para tab bar ───────────────────────────────────────────────────
+// Cada tab tiene 2 variantes: outline (inactivo) + filled (activo).
+// Patrón iOS/Instagram/Linear — el peso visual del filled da presencia
+// al tab activo sin necesidad de dot/línea indicador debajo.
 const ICON_NAME = {
-  Home: 'home',
-  Tareo: 'list',
-  Agenda: 'calendar',
-  Mas: 'layoutGrid',
+  Home:   { outline: 'home',       filled: 'homeFilled' },
+  Tareo:  { outline: 'list',       filled: 'listFilled' },
+  Agenda: { outline: 'calendar',   filled: 'calendarFilled' },
+  Mas:    { outline: 'layoutGrid', filled: 'layoutGridFilled' },
 }
 
 function TabIcon({ name, focused }) {
+  const spec = ICON_NAME[name]
+  const iconName = focused ? spec.filled : spec.outline
   return (
     <View style={styles.iconCol}>
       <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
         <Icon
-          name={ICON_NAME[name]}
+          name={iconName}
           size={22}
           color={focused ? colors.brand[600] : colors.text.softMuted}
-          strokeWidth={focused ? 2.25 : 1.75}
+          strokeWidth={focused ? 1.5 : 1.75}
+          filled={focused}
         />
       </View>
-      {/* Dot indicador debajo del pill activo — patrón iOS/Material 3 */}
       <View style={[styles.activeDot, !focused && styles.activeDotHidden]} />
     </View>
   )
@@ -74,8 +79,9 @@ function FabTabButton({ onPress, accessibilityState, accessibilityLabel }) {
       hitSlop={8}
     >
       <Animated.View style={[styles.fab, { transform: [{ scale }] }]}>
-        <Icon name="plus" size={26} color={colors.text.inverse} strokeWidth={2.25} />
+        <Icon name="plus" size={24} color={colors.text.inverse} strokeWidth={2.5} />
       </Animated.View>
+      <Text style={styles.fabLabel}>Actividad</Text>
     </Pressable>
   )
 }
@@ -128,8 +134,11 @@ function MainTabs() {
             // tabBarButton custom en vez de tabBarIcon: garantiza que el
             // onPress del navigator llegue al FAB (bug anterior: un
             // Pressable interno robaba el evento).
+            // El FabTabButton maneja su propio label "Actividad" debajo
+            // del cuadrado azul — desactivamos el label del navigator.
             tabBarButton: (props) => <FabTabButton {...props} />,
             tabBarLabel: () => null,
+            tabBarLabelPosition: 'below-icon',
           }}
         />
       )}
@@ -250,15 +259,19 @@ const styles = StyleSheet.create({
 
   fabTabButton: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    // ancho similar a los otros tab items; el FAB "sobresale" arriba
-    // por marginTop negativo del hijo animated.
+    paddingTop: 4,
   },
   fab: {
-    width: 56, height: 56,
-    borderRadius: 28,
+    width: 52, height: 40,
+    borderRadius: 12,          // cuadro rounded en vez de círculo
     backgroundColor: colors.brand[600],
     alignItems: 'center', justifyContent: 'center',
-    marginTop: -22,
+    marginTop: -6,
     ...shadow.floating,
+  },
+  fabLabel: {
+    fontSize: 11, fontWeight: '700',
+    color: colors.brand[600],
+    marginTop: 5, letterSpacing: 0.1,
   },
 })

@@ -131,7 +131,7 @@ export default function PickerField({
               </Pressable>
             </View>
 
-            {searchable && items.length > 8 && (
+            {searchable && (
               <View style={styles.searchWrap}>
                 <View style={styles.searchIconLeft}>
                   <Icon name="search" size={16} color={colors.text.tertiary} />
