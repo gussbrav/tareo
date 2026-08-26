@@ -6,6 +6,7 @@ import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from '
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import AgendaScreen from './src/screens/AgendaScreen'
+import CambiarPasswordScreen from './src/screens/CambiarPasswordScreen'
 import EditarActividadScreen from './src/screens/EditarActividadScreen'
 import HomeScreen from './src/screens/HomeScreen'
 import LoginScreen from './src/screens/LoginScreen'
@@ -209,6 +210,11 @@ export default function App() {
                 name="MiCuenta"
                 component={MiCuentaScreen}
                 options={{ title: 'Mi cuenta' }}
+              />
+              <Stack.Screen
+                name="CambiarPassword"
+                component={CambiarPasswordScreen}
+                options={{ title: 'Seguridad' }}
               />
             </>
           ) : (

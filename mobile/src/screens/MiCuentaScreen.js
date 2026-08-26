@@ -89,9 +89,30 @@ export default function MiCuentaScreen({ navigation }) {
           <InfoRow icon="shield" label="Rol" value={roleMeta.label} />
         </View>
 
+        {/* Seguridad — self-service para TODOS los roles.
+            Paridad web: /configuracion/seguridad ahora es accesible por
+            admin/supervisor/trabajador. */}
+        <Text style={styles.sectionOverline}>Seguridad</Text>
+        <View style={styles.card}>
+          <Pressable
+            onPress={() => navigation.navigate('CambiarPassword')}
+            android_ripple={{ color: colors.surfaceSubtle }}
+            style={({ pressed }) => [styles.actionRow, pressed && styles.actionRowPressed]}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: colors.accent[50] }]}>
+              <Icon name="shield" size={18} color={colors.accent[700]} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.actionLabel}>Cambiar contraseña</Text>
+              <Text style={styles.actionHint}>Necesitas la contraseña actual</Text>
+            </View>
+            <Icon name="chevronRight" size={16} color={colors.text.muted} />
+          </Pressable>
+        </View>
+
         {isAdmin && (
           <>
-            <Text style={styles.sectionOverline}>Editar perfil</Text>
+            <Text style={styles.sectionOverline}>Más opciones</Text>
             <View style={styles.card}>
               <Pressable
                 onPress={openWebProfile}
@@ -102,7 +123,7 @@ export default function MiCuentaScreen({ navigation }) {
                   <Icon name="settings" size={18} color={colors.brand[600]} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.actionLabel}>Configurar cuenta y contraseña</Text>
+                  <Text style={styles.actionLabel}>Configuración avanzada</Text>
                   <Text style={styles.actionHint}>Se abre en el navegador web</Text>
                 </View>
                 <Icon name="chevronRight" size={16} color={colors.text.muted} />

@@ -18,7 +18,7 @@ import { useAuthStore } from '../store/auth'
 import { useActiveProjectStore } from '../store/project'
 import { colors, radius, shadow, spacing, type } from '../theme'
 
-const APP_VERSION = '0.9.0'
+const APP_VERSION = '0.9.1'
 const WEB_BASE =
   Constants.expoConfig?.extra?.apiBaseUrl?.replace(/\/$/, '') ||
   'https://tareo.azoramind.com'
