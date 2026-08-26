@@ -280,6 +280,62 @@ function nowMinutesLocal() {
   return d.getHours() * 60 + d.getMinutes()
 }
 
+/**
+ * Lane assignment estilo Google Calendar: para eventos que se solapan en
+ * el tiempo, asigna cada uno a una "columna" (lane) para que se muestren
+ * lado a lado y ningún trabajador quede oculto.
+ *
+ * Algoritmo:
+ *   1. Ordenar por hora de inicio
+ *   2. Para cada evento buscar la primera lane cuya última entrada ya
+ *      terminó (endMin <= startMin nuevo). Si no hay libre, crea una.
+ *   3. Calcular por evento totalLanes = máximo de lanes simultáneas en
+ *      su ventana de tiempo (para saber el ancho relativo que le toca).
+ */
+function computeLanes(items) {
+  const withMin = items
+    .map((it) => {
+      const start = timeToMinutes(it.horinicio)
+      if (start == null) return null
+      const rawEnd = timeToMinutes(it.horfin)
+      const end = rawEnd && rawEnd > start ? rawEnd : start + 30
+      return { ...it, _start: start, _end: end }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a._start - b._start || a._end - b._end)
+
+  const lanes = [] // cada lane = último endMin
+  for (const ev of withMin) {
+    let placed = false
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i] <= ev._start) {
+        lanes[i] = ev._end
+        ev._lane = i
+        placed = true
+        break
+      }
+    }
+    if (!placed) {
+      ev._lane = lanes.length
+      lanes.push(ev._end)
+    }
+  }
+
+  // totalLanes por evento: máximo de solapes concurrentes en su ventana.
+  for (const ev of withMin) {
+    let maxLane = ev._lane
+    for (const other of withMin) {
+      if (other === ev) continue
+      if (other._start < ev._end && other._end > ev._start) {
+        if (other._lane > maxLane) maxLane = other._lane
+      }
+    }
+    ev._totalLanes = maxLane + 1
+  }
+
+  return withMin
+}
+
 function WeekView({ anchor, itemsByDay, today, groupBy, onOpen }) {
   const week = useMemo(() => weekOf(new Date(anchor + 'T12:00:00')), [anchor])
   const [nowMin, setNowMin] = useState(nowMinutesLocal())
@@ -358,7 +414,8 @@ function WeekView({ anchor, itemsByDay, today, groupBy, onOpen }) {
           {/* Columnas por día */}
           {week.map((d) => {
             const iso = isoOf(d)
-            const items = itemsByDay[iso] || []
+            const rawItems = itemsByDay[iso] || []
+            const laned = computeLanes(rawItems)
             const isToday = iso === today.iso
             return (
               <div key={iso} className="relative border-l border-slate-100 first:border-l-0">
@@ -370,9 +427,16 @@ function WeekView({ anchor, itemsByDay, today, groupBy, onOpen }) {
                     className={`border-t ${i === 0 ? 'border-transparent' : 'border-slate-100'}`}
                   />
                 ))}
-                {/* Eventos */}
-                {items.map((it) => (
-                  <WeekEvent key={it.id} item={it} groupBy={groupBy} onOpen={onOpen} />
+                {/* Eventos con lane assignment */}
+                {laned.map((it) => (
+                  <WeekEvent
+                    key={it.id}
+                    item={it}
+                    lane={it._lane}
+                    totalLanes={it._totalLanes}
+                    groupBy={groupBy}
+                    onOpen={onOpen}
+                  />
                 ))}
                 {/* Línea "ahora" (solo en la columna del día actual) */}
                 {isToday && nowVisible && (
@@ -395,11 +459,11 @@ function WeekView({ anchor, itemsByDay, today, groupBy, onOpen }) {
   )
 }
 
-function WeekEvent({ item, groupBy, onOpen }) {
+function WeekEvent({ item, lane = 0, totalLanes = 1, groupBy, onOpen }) {
   const startMin = timeToMinutes(item.horinicio)
   if (startMin == null) return null
-  const endMin = timeToMinutes(item.horfin) || (startMin + 30)
-  // Clipeamos a la ventana visible
+  const rawEnd = timeToMinutes(item.horfin)
+  const endMin = rawEnd && rawEnd > startMin ? rawEnd : startMin + 30
   const clampedStart = Math.max(START_HOUR * 60, startMin)
   const clampedEnd = Math.min(END_HOUR * 60, Math.max(endMin, startMin + 15))
   if (clampedEnd <= START_HOUR * 60 || clampedStart >= END_HOUR * 60) return null
@@ -407,31 +471,48 @@ function WeekEvent({ item, groupBy, onOpen }) {
   const top = ((clampedStart - START_HOUR * 60) / 60) * HOUR_HEIGHT
   const height = Math.max(16, ((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT)
 
+  // Lane layout: cada evento ocupa 1/N del ancho de la columna, con
+  // pequeño offset lateral y micro-overlap para que el borde no se
+  // funda con el vecino.
+  const widthPct = 100 / totalLanes
+  const leftPct = lane * widthPct
+  // Gap visual de 2px entre lanes; borde exterior también 2px.
+  const style = {
+    top,
+    height,
+    left: `calc(${leftPct}% + 2px)`,
+    width: `calc(${widthPct}% - 4px)`,
+    zIndex: 1 + lane,
+  }
+
   const { bg, text } = getEstadoStyle(item.desestadoactividad)
   const label = groupBy === 'actividad'
     ? (item.desactividad || 'Sin descripción')
     : item.trabajador_nombre
 
   const isShort = height < 26
+  const isNarrow = totalLanes >= 3
 
   return (
     <button
       type="button"
       onClick={() => onOpen?.(item)}
-      style={{ top, height, left: 2, right: 2 }}
-      className={`absolute rounded-md px-1.5 text-left overflow-hidden shadow-sm
+      style={style}
+      className={`absolute rounded-md px-1 text-left overflow-hidden shadow-sm
                   transition-all hover:brightness-110 hover:shadow
-                  ${bg} ${text} ${isShort ? 'py-0' : 'py-1'}`}
-      title={`${item.trabajador_nombre} · ${item.desactividad || ''}`}
+                  ${bg} ${text} ${isShort ? 'py-0' : 'py-0.5'}`}
+      title={`${fmtHM(item.horinicio)}${item.horfin ? '–' + fmtHM(item.horfin) : ''} · ${item.trabajador_nombre} · ${item.desactividad || ''}`}
     >
-      <div className={`flex items-center gap-1 ${isShort ? 'text-[9px]' : 'text-[10px]'} font-semibold truncate leading-tight`}>
-        {groupBy === 'actividad' && item.count > 1 && (
+      <div className={`flex items-center gap-1 ${isShort || isNarrow ? 'text-[9px]' : 'text-[10px]'} font-semibold truncate leading-tight`}>
+        {!isNarrow && groupBy === 'actividad' && item.count > 1 && (
           <span className="opacity-90 tabular-nums shrink-0">{item.count}×</span>
         )}
-        <span className="tabular-nums opacity-90 shrink-0">{fmtHM(item.horinicio)}</span>
+        {!isNarrow && (
+          <span className="tabular-nums opacity-90 shrink-0">{fmtHM(item.horinicio)}</span>
+        )}
         <span className="truncate">{label}</span>
       </div>
-      {!isShort && groupBy === 'trabajador' && item.desactividad && (
+      {!isShort && !isNarrow && groupBy === 'trabajador' && item.desactividad && (
         <div className="text-[9px] opacity-90 truncate leading-tight mt-0.5">{item.desactividad}</div>
       )}
     </button>
