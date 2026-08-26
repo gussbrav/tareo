@@ -43,10 +43,68 @@ def insert_bulk(
     return inserted
 
 
-def list_by_date(fecha: date) -> List[Dict[str, Any]]:
+# Haystack para búsqueda: mismo criterio que el filtro client-side anterior
+# (trabajador | actividad | estado | CC). Concat en un solo expr para que cada
+# token buscado sea un ILIKE %tok% aplicado al string completo (equivalente a
+# "todos los tokens deben aparecer en algún lado").
+_HAYSTACK_EXPR = (
+    "CONCAT_WS(' | ', "
+    "t.nbrcompleto, "
+    "COALESCE(a.desactividad, ''), "
+    "a.desestadoactividad, "
+    "COALESCE(cc.nbrcentrocosto, '')"
+    ")"
+)
+
+
+def _search_clause(q: Optional[str]) -> tuple[str, List[Any]]:
+    """Devuelve ('AND (...) AND (...)', [params]) según los tokens de q.
+    Vacío si q es None o solo whitespace."""
+    if not q:
+        return "", []
+    tokens = [t for t in q.strip().split() if t]
+    if not tokens:
+        return "", []
+    clauses = []
+    params: List[Any] = []
+    for tok in tokens:
+        clauses.append(f"{_HAYSTACK_EXPR} ILIKE %s")
+        params.append(f"%{tok}%")
+    return " AND " + " AND ".join(clauses), params
+
+
+def list_by_date(
+    fecha: date,
+    q: Optional[str] = None,
+    page: int = 1,
+    size: int = 50,
+) -> tuple[List[Dict[str, Any]], int]:
+    """Actividades del día paginadas + total (para calcular páginas).
+
+    Ejecuta 2 queries (COUNT + SELECT) con el mismo WHERE. Con índice sobre
+    fecactividad esto es barato incluso con miles de filas por día.
+    """
+    search_sql, search_params = _search_clause(q)
+    offset = max(page - 1, 0) * size
+
     with get_db() as conn, conn.cursor() as cur:
+        # 1. Total (mismo WHERE, sin LIMIT/OFFSET)
         cur.execute(
-            """
+            f"""
+            SELECT COUNT(*) AS n
+              FROM construccion.m_actividad a
+              JOIN construccion.m_trabajador t ON t.id = a.trabajador_id
+              LEFT JOIN construccion.m_centrocosto cc ON cc.id = a.centro_costo_id
+             WHERE a.fecactividad = %s
+             {search_sql};
+            """,
+            (fecha, *search_params),
+        )
+        total = int(cur.fetchone()["n"])
+
+        # 2. Página
+        cur.execute(
+            f"""
             SELECT a.id,
                    a.fecactividad,
                    TO_CHAR(a.fecactividad, 'FMDD Mon') AS fecdia_display,
@@ -71,11 +129,14 @@ def list_by_date(fecha: date) -> List[Dict[str, Any]]:
               LEFT JOIN construccion.m_centrocosto cc ON cc.id = a.centro_costo_id
               LEFT JOIN construccion.m_proyecto p ON p.id = a.proyecto_id
              WHERE a.fecactividad = %s
-             ORDER BY a.created_at DESC;
+             {search_sql}
+             ORDER BY a.created_at DESC
+             LIMIT %s OFFSET %s;
             """,
-            (fecha,),
+            (fecha, *search_params, size, offset),
         )
-        return [dict(r) for r in cur.fetchall()]
+        items = [dict(r) for r in cur.fetchall()]
+    return items, total
 
 
 def list_by_month(
@@ -122,10 +183,35 @@ def list_by_month(
         return [dict(r) for r in cur.fetchall()]
 
 
-def list_by_trabajador(trabajador_id: UUID, fecha: date) -> List[Dict[str, Any]]:
+def list_by_trabajador(
+    trabajador_id: UUID,
+    fecha: date,
+    q: Optional[str] = None,
+    page: int = 1,
+    size: int = 50,
+) -> tuple[List[Dict[str, Any]], int]:
+    """Actividades del día del trabajador logueado, paginadas + total.
+    Volumen típico es bajo (<20/día) pero mantenemos misma forma que list_by_date
+    para consistencia del contrato del endpoint."""
+    search_sql, search_params = _search_clause(q)
+    offset = max(page - 1, 0) * size
+
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(
-            """
+            f"""
+            SELECT COUNT(*) AS n
+              FROM construccion.m_actividad a
+              JOIN construccion.m_trabajador t ON t.id = a.trabajador_id
+              LEFT JOIN construccion.m_centrocosto cc ON cc.id = a.centro_costo_id
+             WHERE a.trabajador_id = %s AND a.fecactividad = %s
+             {search_sql};
+            """,
+            (str(trabajador_id), fecha, *search_params),
+        )
+        total = int(cur.fetchone()["n"])
+
+        cur.execute(
+            f"""
             SELECT a.id, a.fecactividad,
                    TO_CHAR(a.fecactividad, 'FMDD Mon') AS fecdia_display,
                    a.trabajador_id, t.nbrcompleto AS trabajador_nombre,
@@ -146,11 +232,14 @@ def list_by_trabajador(trabajador_id: UUID, fecha: date) -> List[Dict[str, Any]]
               LEFT JOIN construccion.m_centrocosto cc ON cc.id = a.centro_costo_id
               LEFT JOIN construccion.m_proyecto p ON p.id = a.proyecto_id
              WHERE a.trabajador_id = %s AND a.fecactividad = %s
-             ORDER BY a.created_at DESC;
+             {search_sql}
+             ORDER BY a.created_at DESC
+             LIMIT %s OFFSET %s;
             """,
-            (str(trabajador_id), fecha),
+            (str(trabajador_id), fecha, *search_params, size, offset),
         )
-        return [dict(r) for r in cur.fetchall()]
+        items = [dict(r) for r in cur.fetchall()]
+    return items, total
 
 
 def get_by_id(actividad_id: UUID) -> Optional[Dict[str, Any]]:

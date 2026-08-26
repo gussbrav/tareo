@@ -1,6 +1,5 @@
 """Endpoints de actividades (tareo)."""
 from datetime import date
-from typing import List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -10,10 +9,10 @@ from app.auth.schemas import UserPublic
 from app.schemas.actividades import (
     ActividadCreateBulk,
     ActividadDetalle,
-    ActividadListItem,
     ActividadUpdate,
     BulkFinalizeRequest,
     BulkResult,
+    PagedActividadList,
 )
 from app.services import actividades as svc
 
@@ -25,12 +24,15 @@ def crear_bulk(payload: ActividadCreateBulk, user: UserPublic = Depends(get_curr
     return svc.create_bulk(payload, user)
 
 
-@router.get("", response_model=List[ActividadListItem])
+@router.get("", response_model=PagedActividadList)
 def listar(
     fecha: date = Query(..., description="Fecha del tareo (YYYY-MM-DD)"),
+    q: str | None = Query(default=None, max_length=200, description="Búsqueda por trabajador, actividad, estado o CC"),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=50, ge=1, le=200),
     user: UserPublic = Depends(get_current_user),
 ):
-    return svc.list_for_user(fecha, user)
+    return svc.list_for_user(fecha, user, q=q, page=page, size=size)
 
 
 @router.get("/mes")

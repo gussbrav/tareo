@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { actividadesApi } from '../api/actividades'
@@ -9,6 +9,8 @@ import DateField from '../components/admin/DateField.jsx'
 import EditarActividadModal from '../components/EditarActividadModal.jsx'
 import { Icon } from '../components/admin/Icons.jsx'
 import StatusPill from '../components/admin/StatusPill.jsx'
+
+const PAGE_SIZE = 50
 
 // Convención de monitoreo (consistente con Agenda):
 //   iniciado  → emerald (activo, en curso — como los indicadores online)
@@ -36,47 +38,58 @@ export default function Tareo() {
 
   const [fecha, setFecha] = useState(today())
   const [items, setItems] = useState([])
+  const [total, setTotal] = useState(0)
+  const [pages, setPages] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('')
+  // Búsqueda con debounce → parámetro efectivo que se manda al server
+  const [qDebounced, setQDebounced] = useState('')
   const [selected, setSelected] = useState(() => new Set())
   const [editing, setEditing] = useState(null)
   const [deletingActivity, setDeletingActivity] = useState(null)
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
 
+  // Debounce del buscador: espera 400ms tras la última tecla antes de disparar
+  // la request. Al cambiar la búsqueda, volver a página 1.
+  const debounceRef = useRef(null)
+  useEffect(() => {
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setQDebounced(filter)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(debounceRef.current)
+  }, [filter])
+
+  // Al cambiar de fecha, resetear a página 1 (sin esto quedarías en página N
+  // inexistente de otra fecha).
+  useEffect(() => {
+    setPage(1)
+  }, [fecha])
+
   const load = () => {
     setLoading(true)
     setError('')
     actividadesApi
-      .listar(fecha)
+      .listar(fecha, { q: qDebounced, page, size: PAGE_SIZE })
       .then((data) => {
-        setItems(data)
-        setSelected(new Set())
+        setItems(data.items || [])
+        setTotal(data.total || 0)
+        setPages(data.pages || 0)
       })
       .catch(() => setError('No se pudo cargar el tareo'))
       .finally(() => setLoading(false))
   }
 
-  useEffect(load, [fecha])
+  useEffect(load, [fecha, qDebounced, page])
 
-  const filtered = useMemo(() => {
-    const tokens = filter.trim().toLowerCase().split(/\s+/).filter(Boolean)
-    if (tokens.length === 0) return items
-    return items.filter((a) => {
-      const haystack = [
-        a.trabajador_nombre,
-        a.desactividad,
-        a.detalle_resumido,
-        a.desestadoactividad,
-        a.centro_costo_nombre,
-      ].map((s) => (s || '').toLowerCase()).join(' | ')
-      return tokens.every((t) => haystack.includes(t))
-    })
-  }, [items, filter])
-
+  // Selección "seleccionar todas las iniciadas" opera sobre la página visible.
+  // Cross-page selection persiste en `selected` (Set de IDs) al navegar.
   const finalizableIds = useMemo(
-    () => filtered.filter((a) => a.desestadoactividad === 'iniciado').map((a) => a.id),
-    [filtered],
+    () => items.filter((a) => a.desestadoactividad === 'iniciado').map((a) => a.id),
+    [items],
   )
 
   const toggle = (id) =>
@@ -157,16 +170,16 @@ export default function Tareo() {
 
         {loading ? (
           <SkeletonList />
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="card text-center py-10">
             <div className="mx-auto w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
               <Icon.Inbox className="w-5 h-5" />
             </div>
-            <p className="text-sm text-slate-600">No tenés tareas asignadas para esta fecha.</p>
+            <p className="text-sm text-slate-600">No tienes tareas asignadas para esta fecha.</p>
           </div>
         ) : (
           <ul className="space-y-3">
-            {filtered.map((a) => (
+            {items.map((a) => (
               <li key={a.id} className="card !p-5 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <StatusPill tone={stateTone(a.desestadoactividad)}>
@@ -212,7 +225,7 @@ export default function Tareo() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Registro de tareo</h1>
         <p className="text-slate-500 text-sm mt-1">
-          {items.length} {items.length === 1 ? 'actividad' : 'actividades'} · {fecha}
+          {total} {total === 1 ? 'actividad' : 'actividades'} · {fecha}
         </p>
       </div>
 
@@ -246,7 +259,7 @@ export default function Tareo() {
                 checked={allSelected}
                 onChange={toggleAll}
               />
-              Seleccionar las {finalizableIds.length} iniciadas
+              Seleccionar las {finalizableIds.length} iniciadas de esta página
             </label>
             <button
               className="btn-primary btn-sm"
@@ -265,16 +278,16 @@ export default function Tareo() {
 
       {loading ? (
         <SkeletonList />
-      ) : filtered.length === 0 ? (
+      ) : items.length === 0 ? (
         <div className="card text-center py-12">
           <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
             <Icon.Inbox className="w-6 h-6" />
           </div>
           <h3 className="text-sm font-medium text-slate-900">Sin actividades</h3>
           <p className="text-sm text-slate-500 mt-1">
-            {filter ? 'No hay resultados para tu búsqueda.' : 'Todavía no hay actividades para esta fecha.'}
+            {qDebounced ? 'No hay resultados para tu búsqueda.' : 'Todavía no hay actividades para esta fecha.'}
           </p>
-          {!filter && (
+          {!qDebounced && (
             <button
               className="btn-primary btn-sm mt-4"
               onClick={() => navigate('/actividades/nueva')}
@@ -286,7 +299,7 @@ export default function Tareo() {
         </div>
       ) : (
         <ul className="space-y-2">
-          {filtered.map((a) => {
+          {items.map((a) => {
             const canSelect = a.desestadoactividad === 'iniciado'
             const isSelected = selected.has(a.id)
             return (
@@ -366,6 +379,17 @@ export default function Tareo() {
         </ul>
       )}
 
+      {pages > 1 && (
+        <Paginator
+          page={page}
+          pages={pages}
+          total={total}
+          size={PAGE_SIZE}
+          onPageChange={setPage}
+          disabled={loading}
+        />
+      )}
+
       {editing && (
         <EditarActividadModal
           actividadId={editing}
@@ -407,6 +431,42 @@ function Toast({ tone, children }) {
     : 'bg-emerald-50 border-emerald-200 text-emerald-700'
   return (
     <div className={`rounded-md border text-sm px-3 py-2 ${cls}`}>{children}</div>
+  )
+}
+
+function Paginator({ page, pages, total, size, onPageChange, disabled }) {
+  const from = total === 0 ? 0 : (page - 1) * size + 1
+  const to = Math.min(page * size, total)
+  const canPrev = page > 1 && !disabled
+  const canNext = page < pages && !disabled
+  return (
+    <div className="flex items-center justify-between text-sm text-slate-600 pt-1">
+      <span className="tabular-nums">
+        Mostrando <strong className="text-slate-900">{from}–{to}</strong> de{' '}
+        <strong className="text-slate-900">{total}</strong>
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          className="btn-secondary btn-sm"
+          onClick={() => onPageChange(page - 1)}
+          disabled={!canPrev}
+          aria-label="Página anterior"
+        >
+          ← Anterior
+        </button>
+        <span className="px-3 text-xs text-slate-500 tabular-nums">
+          Página {page} de {pages}
+        </span>
+        <button
+          className="btn-secondary btn-sm"
+          onClick={() => onPageChange(page + 1)}
+          disabled={!canNext}
+          aria-label="Página siguiente"
+        >
+          Siguiente →
+        </button>
+      </div>
+    </div>
   )
 }
 

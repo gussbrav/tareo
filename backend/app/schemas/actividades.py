@@ -74,3 +74,14 @@ class BulkFinalizeRequest(BaseModel):
 class BulkResult(BaseModel):
     updated: int
     requested: int
+
+
+class PagedActividadList(BaseModel):
+    """Respuesta paginada de actividades del día. Wrap sobre la lista para
+    permitir volúmenes >200 sin degradar rendering ni payload."""
+
+    items: List[ActividadListItem]
+    total: int
+    page: int
+    size: int
+    pages: int

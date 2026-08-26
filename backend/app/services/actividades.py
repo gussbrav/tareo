@@ -40,18 +40,30 @@ def create_bulk(payload: ActividadCreateBulk, user: UserPublic) -> Dict[str, Any
     return {"created": inserted, "requested": len(unique_ids)}
 
 
-def list_for_user(fecha: date, user: UserPublic) -> List[Dict[str, Any]]:
+def list_for_user(
+    fecha: date,
+    user: UserPublic,
+    q: Optional[str] = None,
+    page: int = 1,
+    size: int = 50,
+) -> Dict[str, Any]:
     """Reglas de visibilidad:
 
     - admin y supervisor: ven todas las actividades del día.
     - trabajador: ve solo las suyas (según user.trabajador_id).
+
+    Devuelve dict paginado {items, total, page, size, pages} — forma consistente
+    para cualquier rol (permite un mismo cliente sin ramas por role).
     """
     if user.role == "trabajador":
         if not user.trabajador_id:
             # Trabajador sin trabajador_id linkeado: no ve nada. Evita filtrar por None.
-            return []
-        return repo.list_by_trabajador(user.trabajador_id, fecha)
-    return repo.list_by_date(fecha)
+            return {"items": [], "total": 0, "page": page, "size": size, "pages": 0}
+        items, total = repo.list_by_trabajador(user.trabajador_id, fecha, q=q, page=page, size=size)
+    else:
+        items, total = repo.list_by_date(fecha, q=q, page=page, size=size)
+    pages = (total + size - 1) // size if total else 0
+    return {"items": items, "total": total, "page": page, "size": size, "pages": pages}
 
 
 def list_month_for_user(

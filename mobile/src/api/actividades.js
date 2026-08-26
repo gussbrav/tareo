@@ -1,7 +1,12 @@
 import { api } from './client'
 
 export const actividadesApi = {
-  listar: (fecha) => api.get('/api/actividades', { params: { fecha } }).then((r) => r.data),
+  // Backend ahora devuelve { items, total, page, size, pages }. En mobile no
+  // paginamos aún (UI Gmail-style pendiente), así que pedimos el máximo (200)
+  // y desempaquetamos .items para no romper los consumidores existentes.
+  listar: (fecha) =>
+    api.get('/api/actividades', { params: { fecha, size: 200 } })
+      .then((r) => r.data?.items || []),
   listarMes: (mes, filtros = {}) =>
     api.get('/api/actividades/mes', { params: { mes, ...filtros } }).then((r) => r.data),
   detalle: (id) => api.get(`/api/actividades/${id}`).then((r) => r.data),
