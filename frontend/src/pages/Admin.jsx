@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { adminApi } from '../api/admin'
 import AdminGeneral from '../components/AdminGeneral.jsx'
@@ -17,13 +17,18 @@ const TABS = [
   { id: 'usuarios',      label: 'Usuarios',          group: 'Equipo',    icon: Icon.Key },
   { id: 'permisos',      label: 'Roles y permisos',  group: 'Equipo',    icon: Icon.Shield },
   { id: 'categorias',    label: 'Categorías',        group: 'Catálogos', icon: Icon.Tag },
-  { id: 'areas',         label: 'Áreas',             group: 'Catálogos', icon: Icon.Layers },
-  { id: 'especialidades',label: 'Especialidades',    group: 'Catálogos', icon: Icon.Beaker },
-  { id: 'centros',       label: 'Centros de costo',  group: 'Catálogos', icon: Icon.Building },
   { id: 'proyectos',     label: 'Proyectos',         group: 'Catálogos', icon: Icon.Folder },
+  { id: 'areas',         label: 'Áreas',             group: 'Por proyecto', icon: Icon.Layers },
+  { id: 'especialidades',label: 'Especialidades',    group: 'Por proyecto', icon: Icon.Beaker },
+  { id: 'centros',       label: 'Centros de costo',  group: 'Por proyecto', icon: Icon.Building },
 ]
 
-// Configs declarativas por master (menos código, cero duplicación).
+// Tabs cuyo contenido está anclado a un proyecto (usan el selector superior).
+const PROYECTO_SCOPED_TABS = new Set(['areas', 'especialidades', 'centros'])
+
+const SCOPE_STORAGE_KEY = 'tareo:admin-scope-proyecto-v1'
+
+// ─── Configs de las tablas maestras ───────────────────────────────────────
 
 const areasConfig = {
   api: adminApi.areas,
@@ -32,6 +37,8 @@ const areasConfig = {
   countLabel: 'áreas',
   searchKeys: ['codarea', 'nbrarea'],
   deleteFlagField: 'flgactivoarea',
+  injectProyectoAs: 'proyecto_id',
+  showCecoImporter: true,
   columns: [
     { key: 'codarea',       label: 'Código', sortable: true },
     { key: 'nbrarea',       label: 'Nombre', sortable: true },
@@ -64,9 +71,13 @@ const especialidadesConfig = {
       label: 'Área',
       type: 'select',
       required: true,
-      optionsAsync: () =>
-        adminApi.areas.list().then((rs) =>
-          rs.filter((a) => a.flgactivoarea).map((a) => ({ value: a.id, label: `${a.codarea} - ${a.nbrarea}` })),
+      // optionsAsync recibe scopeProyectoId como argumento — filtra las
+      // áreas al proyecto activo para que no aparezcan áreas de otros.
+      optionsAsync: (proyectoId) =>
+        adminApi.areas.list(proyectoId ? { proyecto_id: proyectoId } : {}).then((rs) =>
+          rs.filter((a) => a.flgactivoarea).map((a) => ({
+            value: a.id, label: `${a.codarea} - ${a.nbrarea}`,
+          })),
         ),
     },
     { key: 'codespecialidad', label: 'Código', required: true },
@@ -97,8 +108,8 @@ const centrosConfig = {
       label: 'Especialidad',
       type: 'select',
       required: true,
-      optionsAsync: () =>
-        adminApi.especialidades.list().then((rs) =>
+      optionsAsync: (proyectoId) =>
+        adminApi.especialidades.list(proyectoId ? { proyecto_id: proyectoId } : {}).then((rs) =>
           rs.filter((e) => e.flgactivoespecialidad).map((e) => ({
             value: e.id,
             label: `${e.area_nombre || '?'} → ${e.codespecialidad} ${e.nbrespecialidad}`,
@@ -164,8 +175,77 @@ const categoriasConfig = {
   defaults: { codcategoria: '', nbrcategoria: '', flgactivocategoria: true },
 }
 
+// ─── Selector de proyecto activo (persistido) ─────────────────────────────
+
+function ProyectoScopeBar({ proyectos, value, onChange }) {
+  const activo = proyectos.find((p) => p.id === value)
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-4 py-3 bg-brand-50/60 border border-brand-100 rounded-xl">
+      <div className="flex items-center gap-2 min-w-0">
+        <Icon.Folder className="w-4 h-4 text-brand-600 shrink-0" />
+        <span className="text-sm font-medium text-slate-800 shrink-0">Proyecto activo:</span>
+      </div>
+      <select
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="input input-sm flex-1 min-w-[220px] max-w-[420px]"
+      >
+        <option value="">— Elegí un proyecto —</option>
+        {proyectos.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.descontratoproyecto ? `${p.descontratoproyecto} · ` : ''}
+            {p.nbrproyecto || `Proyecto ${p.codproyecto}`}
+            {p.cliproyecto ? ` (${p.cliproyecto})` : ''}
+          </option>
+        ))}
+      </select>
+      {activo && (
+        <span className="text-xs text-slate-500 shrink-0">
+          Todas las áreas, especialidades y CC de esta sección corresponden a este proyecto.
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function Admin() {
   const [tab, setTab] = useState('general')
+  const [proyectos, setProyectos] = useState([])
+  const [scopeProyectoId, setScopeProyectoIdState] = useState(
+    () => localStorage.getItem(SCOPE_STORAGE_KEY) || null,
+  )
+
+  const setScopeProyectoId = (id) => {
+    setScopeProyectoIdState(id)
+    if (id) localStorage.setItem(SCOPE_STORAGE_KEY, id)
+    else localStorage.removeItem(SCOPE_STORAGE_KEY)
+  }
+
+  // Carga la lista de proyectos activos (para el selector)
+  useEffect(() => {
+    adminApi.proyectos.list()
+      .then((rs) => {
+        const activos = rs.filter((p) => p.flgactivoproyecto)
+        setProyectos(activos)
+        // Auto-selecciona el primero si no hay uno elegido y no existe el guardado
+        setScopeProyectoIdState((prev) => {
+          if (prev && activos.some((p) => p.id === prev)) return prev
+          const first = activos[0]?.id || null
+          if (first) localStorage.setItem(SCOPE_STORAGE_KEY, first)
+          return first
+        })
+      })
+      .catch(() => {})
+  }, [])
+
+  const proyectoActivo = useMemo(
+    () => proyectos.find((p) => p.id === scopeProyectoId) || null,
+    [proyectos, scopeProyectoId],
+  )
+
+  const isScopedTab = PROYECTO_SCOPED_TABS.has(tab)
 
   return (
     <div className="space-y-6">
@@ -179,17 +259,47 @@ export default function Admin() {
       <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6">
         <AdminSidebar tabs={TABS} active={tab} onSelect={setTab} />
 
-        <section className="min-w-0">
+        <section className="min-w-0 space-y-4">
+          {/* Selector de proyecto: sólo visible en tabs por-proyecto */}
+          {isScopedTab && proyectos.length > 0 && (
+            <ProyectoScopeBar
+              proyectos={proyectos}
+              value={scopeProyectoId}
+              onChange={setScopeProyectoId}
+            />
+          )}
+
           {tab === 'general' && <AdminGeneral />}
           {tab === 'marca' && <AdminSettings />}
           {tab === 'trabajadores' && <AdminTrabajadores />}
           {tab === 'usuarios' && <AdminUsuarios />}
           {tab === 'permisos' && <AdminPermisos />}
           {tab === 'categorias' && <AdminMasterTable {...categoriasConfig} />}
-          {tab === 'areas' && <AdminMasterTable {...areasConfig} />}
-          {tab === 'especialidades' && <AdminMasterTable {...especialidadesConfig} />}
-          {tab === 'centros' && <AdminMasterTable {...centrosConfig} />}
           {tab === 'proyectos' && <AdminMasterTable {...proyectosConfig} />}
+          {tab === 'areas' && (
+            <AdminMasterTable
+              {...areasConfig}
+              scopeProyectoId={scopeProyectoId}
+              proyectoActivo={proyectoActivo}
+              optionsAsyncArgs={[scopeProyectoId]}
+            />
+          )}
+          {tab === 'especialidades' && (
+            <AdminMasterTable
+              {...especialidadesConfig}
+              scopeProyectoId={scopeProyectoId}
+              proyectoActivo={proyectoActivo}
+              optionsAsyncArgs={[scopeProyectoId]}
+            />
+          )}
+          {tab === 'centros' && (
+            <AdminMasterTable
+              {...centrosConfig}
+              scopeProyectoId={scopeProyectoId}
+              proyectoActivo={proyectoActivo}
+              optionsAsyncArgs={[scopeProyectoId]}
+            />
+          )}
         </section>
       </div>
     </div>

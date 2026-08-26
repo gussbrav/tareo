@@ -39,15 +39,31 @@ export default function NuevaActividad() {
   const [ok, setOk] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Carga proyectos al inicio
   useEffect(() => {
-    Promise.all([catalogosApi.proyectos(), catalogosApi.areas()])
-      .then(([prs, ars]) => {
+    catalogosApi.proyectos()
+      .then((prs) => {
         setProyectos(prs)
-        setAreas(ars)
         if (prs.length && !proyectoId) setProyectoId(prs[0].id)
       })
-      .catch(() => setError('No se pudieron cargar los catálogos'))
+      .catch(() => setError('No se pudieron cargar los proyectos'))
   }, []) // eslint-disable-line
+
+  // Áreas del proyecto seleccionado — se recargan si cambia el proyecto,
+  // se limpian los hijos (área, especialidad, CC) para evitar inconsistencias.
+  useEffect(() => {
+    setAreas([])
+    setAreaId('')
+    setEspecialidades([])
+    setEspecialidadId('')
+    setCentrosCosto([])
+    setCentroCostoId('')
+    if (proyectoId) {
+      catalogosApi.areas(proyectoId)
+        .then(setAreas)
+        .catch(() => setError('No se pudieron cargar las áreas del proyecto'))
+    }
+  }, [proyectoId])
 
   useEffect(() => {
     catalogosApi.trabajadoresDisponibles(fecha).then(setTrabajadores).catch(() => setTrabajadores([]))
@@ -186,14 +202,32 @@ export default function NuevaActividad() {
             </div>
             <div>
               <label className="label">Área <Req /></label>
-              <select className="input" value={areaId} onChange={(e) => setAreaId(e.target.value)} required>
-                <option value="">Selecciona…</option>
+              <select
+                className="input"
+                value={areaId}
+                onChange={(e) => setAreaId(e.target.value)}
+                required
+                disabled={!proyectoId || areas.length === 0}
+              >
+                <option value="">
+                  {!proyectoId
+                    ? 'Elegí un proyecto primero'
+                    : areas.length === 0
+                      ? 'Este proyecto no tiene áreas'
+                      : 'Selecciona…'}
+                </option>
                 {areas.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.display_name}
                   </option>
                 ))}
               </select>
+              {proyectoId && areas.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Cargá las áreas de este proyecto desde <strong>Configuración → Áreas</strong>
+                  {' '}(o importalas del Excel).
+                </p>
+              )}
             </div>
             <div>
               <label className="label">Especialidad <Req /></label>
