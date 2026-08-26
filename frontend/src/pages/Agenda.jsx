@@ -221,8 +221,9 @@ function MonthView({ year, month, itemsByDay, selectedDay, setSelectedDay, today
           const isSelected = cell.current && cell.iso === selectedDay
           const dayItems = cell.iso ? (itemsByDay[cell.iso] || []) : []
           const total = dayItems.length
-          // Mostrar hasta 4 pills; el resto como "+N" compacto.
-          const MAX = 4
+          // 3 pills visibles + "+N" compacto para el resto. Con 4 el 4to
+          // se corta visualmente (celdas de altura variable según pantalla).
+          const MAX = 3
           const shown = dayItems.slice(0, MAX)
           const extras = Math.max(0, total - MAX)
           const borders = idx % 7 !== 0 ? 'border-l border-slate-100' : ''
@@ -284,27 +285,29 @@ function WeekView({ anchor, itemsByDay, today, groupBy, onOpen }) {
   const [nowMin, setNowMin] = useState(nowMinutesLocal())
   const scrollRef = useRef(null)
 
-  // Actualiza la línea roja cada minuto
+  // Actualiza la línea roja cada minuto (sólo re-render, no re-scroll)
   useEffect(() => {
     const id = setInterval(() => setNowMin(nowMinutesLocal()), 60_000)
     return () => clearInterval(id)
   }, [])
 
-  // Auto-scroll a "ahora" al montar (o a 8 AM si estamos fuera del rango visible)
+  // Auto-scroll estilo Google Calendar:
+  //   - al montar la vista (switch a Semana)
+  //   - al cambiar de semana (prev/next)
+  // Regla: si hoy está en la semana visible → scroll a "ahora - 1.5h" de
+  // contexto. Sino → 8 AM. Usa nowMinutesLocal() para leer el reloj al
+  // momento de scrollear (no depende de nowMin state para no re-scrollear
+  // cada minuto).
   useEffect(() => {
     if (!scrollRef.current) return
-    const target = nowMin >= START_HOUR * 60 && nowMin <= END_HOUR * 60
-      ? nowMin - START_HOUR * 60 - 90 // 1.5h de contexto arriba
-      : (8 - START_HOUR) * 60         // 8 AM por default
-    scrollRef.current.scrollTop = Math.max(0, (target / 60) * HOUR_HEIGHT)
-    // solo mount — anchor changes handled below
+    const now = nowMinutesLocal()
+    const todayInWeek = week.some((d) => isoOf(d) === today.iso)
+    const inRange = now >= START_HOUR * 60 && now <= END_HOUR * 60
+    const targetMin = (todayInWeek && inRange)
+      ? Math.max(0, now - START_HOUR * 60 - 90)  // ahora con 1.5h de contexto
+      : (8 - START_HOUR) * 60                     // 8 AM por default
+    scrollRef.current.scrollTop = (targetMin / 60) * HOUR_HEIGHT
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Cuando cambia la semana anclada, scrollear también
-  useEffect(() => {
-    if (!scrollRef.current) return
-    scrollRef.current.scrollTop = Math.max(0, ((8 - START_HOUR) * 60 / 60) * HOUR_HEIGHT)
   }, [anchor])
 
   const totalHeight = HOURS.length * HOUR_HEIGHT
