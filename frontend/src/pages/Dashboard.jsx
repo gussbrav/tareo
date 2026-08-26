@@ -8,6 +8,7 @@ import { reportesApi } from '../api/reportes'
 import { useAuthStore } from '../store/auth'
 import { today } from '../lib/format'
 import DateField from '../components/admin/DateField.jsx'
+import { Icon } from '../components/admin/Icons.jsx'
 import KpiCard from '../components/dashboard/KpiCard'
 import TendenciaChart from '../components/dashboard/TendenciaChart'
 import RankingList from '../components/dashboard/RankingList'
@@ -121,9 +122,9 @@ function IconRate() {
 function SelectFiltro({ label, value, onChange, options, placeholder = 'Todos' }) {
   return (
     <div className="flex flex-col gap-1 min-w-0">
-      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</label>
+      <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</label>
       <select
-        className="input text-sm py-1.5"
+        className="input input-sm"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
@@ -134,6 +135,21 @@ function SelectFiltro({ label, value, onChange, options, placeholder = 'Todos' }
       </select>
     </div>
   )
+}
+
+function formatRange(desde, hasta) {
+  try {
+    const d1 = new Date(desde + 'T00:00:00')
+    const d2 = new Date(hasta + 'T00:00:00')
+    const opts = { day: '2-digit', month: 'short' }
+    const sameYear = d1.getFullYear() === d2.getFullYear()
+    const yearOpts = sameYear ? {} : { year: 'numeric' }
+    const s1 = d1.toLocaleDateString('es-PE', { ...opts, ...yearOpts })
+    const s2 = d2.toLocaleDateString('es-PE', { ...opts, year: 'numeric' })
+    return `${s1} → ${s2}`
+  } catch {
+    return `${desde} → ${hasta}`
+  }
 }
 
 // ─── Estado inicial del filtro ─────────────────────────────────────────────────
@@ -241,13 +257,13 @@ export default function Dashboard() {
       {/* ── Encabezado ── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Analytics</h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            {filtro.desde} · {filtro.hasta} &middot; {diasRango} días
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Analytics</h1>
+          <p className="text-slate-500 text-sm mt-1 tabular-nums">
+            {formatRange(filtro.desde, filtro.hasta)} <span className="text-slate-400">· {diasRango} días</span>
           </p>
         </div>
         {canExport && (
-          <button className="btn-secondary" onClick={handleExport} disabled={exporting || loading}>
+          <button className="btn-secondary btn-sm" onClick={handleExport} disabled={exporting || loading}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
               <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -257,17 +273,17 @@ export default function Dashboard() {
       </div>
 
       {/* ── Panel de filtros ── */}
-      <div className="card space-y-4">
-        {/* Presets */}
-        <div className="flex flex-wrap gap-1.5">
+      <div className="card !p-4 space-y-4">
+        {/* Presets — segmented control */}
+        <div className="inline-flex flex-wrap items-center gap-1 p-1 bg-slate-100/70 rounded-lg">
           {PRESETS.map((p, i) => (
             <button
               key={p.label}
               onClick={() => handlePreset(i)}
-              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                 presetActivo === i
-                  ? 'bg-brand-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               {p.label}
@@ -278,9 +294,9 @@ export default function Dashboard() {
         {/* Rango manual + filtros dimensionales */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Desde</label>
+            <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Desde</label>
             <DateField
-              className="text-sm py-1.5"
+              className="input-sm"
               value={filtro.desde}
               onChange={(e) => {
                 setPresetActivo(null)
@@ -289,9 +305,9 @@ export default function Dashboard() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Hasta</label>
+            <label className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Hasta</label>
             <DateField
-              className="text-sm py-1.5"
+              className="input-sm"
               value={filtro.hasta}
               onChange={(e) => {
                 setPresetActivo(null)

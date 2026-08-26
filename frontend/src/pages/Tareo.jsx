@@ -6,10 +6,21 @@ import { today, fmtHM, minutosToHoras } from '../lib/format'
 import { useAuthStore } from '../store/auth'
 import DateField from '../components/admin/DateField.jsx'
 import EditarActividadModal from '../components/EditarActividadModal.jsx'
+import { Icon } from '../components/admin/Icons.jsx'
+import StatusPill from '../components/admin/StatusPill.jsx'
 
-const estadoStyles = {
-  iniciado: 'bg-amber-50 text-amber-800 border-amber-200',
-  finalizado: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+const stateTone = (estado) =>
+  estado === 'finalizado' ? 'emerald' : estado === 'iniciado' ? 'amber' : 'slate'
+
+function initials(name) {
+  if (!name) return '??'
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
 }
 
 export default function Tareo() {
@@ -104,51 +115,62 @@ export default function Tareo() {
     }
   }
 
-  // ---------- Vista trabajador (UI simplificada) ----------
+  // ---------- Vista trabajador (mobile-first, minimal) ----------
   if (isTrabajador) {
     return (
       <div className="space-y-5 max-w-2xl mx-auto">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Mis tareas</h1>
-          <p className="text-slate-500 text-sm">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Mis tareas</h1>
+          <p className="text-slate-500 text-sm mt-1">
             Hola {user?.first_name || 'trabajador'}, estas son tus asignaciones.
           </p>
         </div>
 
-        <div className="card">
+        <div className="card !p-4">
           <label className="label">Fecha</label>
           <DateField value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </div>
 
-        {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>}
-        {msg && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-3 py-2">{msg}</div>}
+        {error && <Toast tone="error">{error}</Toast>}
+        {msg && <Toast tone="success">{msg}</Toast>}
 
         {loading ? (
-          <p className="text-slate-500 text-sm">Cargando…</p>
+          <SkeletonList />
         ) : filtered.length === 0 ? (
-          <div className="card text-slate-500 text-sm text-center">
-            No tienes tareas asignadas para esta fecha.
+          <div className="card text-center py-10">
+            <div className="mx-auto w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+              <Icon.Inbox className="w-5 h-5" />
+            </div>
+            <p className="text-sm text-slate-600">No tenés tareas asignadas para esta fecha.</p>
           </div>
         ) : (
           <ul className="space-y-3">
             {filtered.map((a) => (
-              <li key={a.id} className="card space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className={`inline-block text-xs px-2 py-0.5 rounded border ${estadoStyles[a.desestadoactividad] || ''}`}>
-                      {a.desestadoactividad}
-                    </span>
-                    <p className="mt-2 text-lg font-medium text-slate-900">{a.desactividad}</p>
-                  </div>
+              <li key={a.id} className="card !p-5 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <StatusPill tone={stateTone(a.desestadoactividad)}>
+                    {a.desestadoactividad}
+                  </StatusPill>
                   <span className="text-xs text-slate-400 shrink-0">{a.fecdia_display}</span>
                 </div>
-                <div className="text-sm text-slate-500 space-y-0.5">
-                  <div>Inicio: <span className="text-slate-800 font-medium">{fmtHM(a.horinicio)}</span></div>
-                  <div>Fin: <span className="text-slate-800 font-medium">{fmtHM(a.horfin)}</span> · Duración: {minutosToHoras(a.numduracionminuto)}</div>
-                  {a.centro_costo_nombre && <div>Centro costo: {a.centro_costo_nombre}</div>}
-                </div>
+                <p className="text-lg font-medium text-slate-900 leading-snug">{a.desactividad}</p>
+                <dl className="text-sm text-slate-500 grid grid-cols-2 gap-y-1">
+                  <dt>Inicio</dt>
+                  <dd className="text-slate-800 font-medium text-right">{fmtHM(a.horinicio)}</dd>
+                  <dt>Fin</dt>
+                  <dd className="text-slate-800 font-medium text-right">{fmtHM(a.horfin)}</dd>
+                  <dt>Duración</dt>
+                  <dd className="text-slate-800 font-medium text-right">{minutosToHoras(a.numduracionminuto)}</dd>
+                  {a.centro_costo_nombre && (
+                    <>
+                      <dt>Centro costo</dt>
+                      <dd className="text-slate-800 text-right truncate">{a.centro_costo_nombre}</dd>
+                    </>
+                  )}
+                </dl>
                 {a.desestadoactividad === 'iniciado' && (
                   <button onClick={() => finalizeOne(a.id)} className="btn-primary w-full text-base py-3">
+                    <Icon.Check className="w-4 h-4" />
                     Finalizar tarea
                   </button>
                 )}
@@ -161,105 +183,149 @@ export default function Tareo() {
   }
 
   // ---------- Vista admin / supervisor ----------
+  const allSelected = finalizableIds.length > 0 && selected.size === finalizableIds.length
+  const hasSelection = selected.size > 0
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">
-          Registro de tareo <span className="text-slate-400 text-base font-normal">· {items.length} actividad(es)</span>
-        </h1>
-        <button className="btn-primary" onClick={() => navigate('/actividades/nueva')}>
-          + Nueva actividad
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Registro de tareo</h1>
+          <p className="text-slate-500 text-sm mt-1">
+            {items.length} {items.length === 1 ? 'actividad' : 'actividades'} · {fecha}
+          </p>
+        </div>
+        <button className="btn-primary btn-sm" onClick={() => navigate('/actividades/nueva')}>
+          <Icon.Plus className="w-4 h-4" />
+          Nueva actividad
         </button>
       </div>
 
-      <div className="card space-y-4">
+      {/* Filtros */}
+      <div className="card !p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="label">Fecha</label>
             <DateField value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </div>
           <div className="sm:col-span-2">
-            <label className="label">Filtrar</label>
-            <input
-              className="input"
-              placeholder="Buscar por trabajador, descripción o estado…"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            />
+            <label className="label">Buscar</label>
+            <div className="relative">
+              <Icon.Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                className="input pl-8"
+                placeholder="Buscar por trabajador, descripción o estado…"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 pt-1">
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              className="rounded text-brand-600 focus:ring-brand-500"
-              checked={selected.size > 0 && selected.size === finalizableIds.length}
-              onChange={toggleAll}
-              disabled={finalizableIds.length === 0}
-            />
-            Seleccionar todas las iniciadas
-          </label>
-          <button className="btn-primary" onClick={finalizeBatch} disabled={selected.size === 0}>
-            Finalizar {selected.size > 0 ? `(${selected.size})` : ''}
-          </button>
-        </div>
+        {finalizableIds.length > 0 && (
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 -mx-4 px-4">
+            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/30"
+                checked={allSelected}
+                onChange={toggleAll}
+              />
+              Seleccionar las {finalizableIds.length} iniciadas
+            </label>
+            <button
+              className="btn-primary btn-sm"
+              onClick={finalizeBatch}
+              disabled={!hasSelection}
+            >
+              <Icon.Check className="w-4 h-4" />
+              Finalizar{hasSelection ? ` (${selected.size})` : ''}
+            </button>
+          </div>
+        )}
 
-        {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>}
-        {msg && <div className="rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm px-3 py-2">{msg}</div>}
+        {error && <Toast tone="error">{error}</Toast>}
+        {msg && <Toast tone="success">{msg}</Toast>}
       </div>
 
       {loading ? (
-        <p className="text-slate-500 text-sm">Cargando…</p>
+        <SkeletonList />
       ) : filtered.length === 0 ? (
-        <div className="card text-slate-500 text-sm text-center">
-          Sin actividades para esta fecha. Crea una nueva desde el botón de arriba.
+        <div className="card text-center py-12">
+          <div className="mx-auto w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+            <Icon.Inbox className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-medium text-slate-900">Sin actividades</h3>
+          <p className="text-sm text-slate-500 mt-1">
+            {filter ? 'No hay resultados para tu búsqueda.' : 'Todavía no hay actividades para esta fecha.'}
+          </p>
+          {!filter && (
+            <button
+              className="btn-primary btn-sm mt-4"
+              onClick={() => navigate('/actividades/nueva')}
+            >
+              <Icon.Plus className="w-4 h-4" />
+              Nueva actividad
+            </button>
+          )}
         </div>
       ) : (
         <ul className="space-y-2">
           {filtered.map((a) => {
             const canSelect = a.desestadoactividad === 'iniciado'
+            const isSelected = selected.has(a.id)
             return (
               <li
                 key={a.id}
-                className={`rounded-xl border shadow-card p-4 flex items-start gap-3 bg-white ${
-                  a.desestadoactividad === 'finalizado' ? 'opacity-90' : ''
-                }`}
+                className={`card !p-4 flex items-start gap-3 transition-colors ${
+                  isSelected ? 'ring-2 ring-brand-500/40 border-brand-300' : ''
+                } ${a.desestadoactividad === 'finalizado' ? 'opacity-75' : ''}`}
               >
                 <input
                   type="checkbox"
-                  className="mt-1 rounded text-brand-600 focus:ring-brand-500"
-                  checked={selected.has(a.id)}
+                  className="mt-1.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500/30 disabled:opacity-40"
+                  checked={isSelected}
                   onChange={() => toggle(a.id)}
                   disabled={!canSelect}
                   title={canSelect ? 'Seleccionar' : 'Ya finalizada'}
                 />
+                <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-brand-50 text-brand-700 text-xs font-semibold shrink-0 mt-0.5">
+                  {initials(a.trabajador_nombre)}
+                </span>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-slate-900 truncate">{a.trabajador_nombre}</p>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-slate-400">{a.fecdia_display}</span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 truncate">{a.trabajador_nombre}</p>
+                      <p className="text-sm text-slate-700 mt-0.5 break-words">{a.desactividad}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-xs text-slate-400 hidden sm:inline">{a.fecdia_display}</span>
                       {canEdit && (
                         <button
                           onClick={() => setEditing(a.id)}
-                          className="text-xs text-brand-600 hover:text-brand-700 font-medium"
-                          title="Editar / Mantenimiento"
+                          className="icon-btn"
+                          title="Editar"
+                          aria-label="Editar"
                         >
-                          Editar
+                          <Icon.Edit className="w-4 h-4" />
                         </button>
                       )}
                     </div>
                   </div>
-                  <p className="text-sm text-slate-700 mt-1 break-words">{a.desactividad}</p>
-                  <div className="mt-2 flex flex-wrap gap-2 items-center">
-                    <span className={`inline-block text-xs px-2 py-0.5 rounded border ${estadoStyles[a.desestadoactividad] || ''}`}>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <StatusPill tone={stateTone(a.desestadoactividad)}>
                       {a.desestadoactividad}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      Inicio {fmtHM(a.horinicio)} · Fin {fmtHM(a.horfin)} · {minutosToHoras(a.numduracionminuto)}
+                    </StatusPill>
+                    <span className="text-xs text-slate-500 tabular-nums">
+                      {fmtHM(a.horinicio)}
+                      {' → '}
+                      {fmtHM(a.horfin)}
+                      <span className="text-slate-400"> · {minutosToHoras(a.numduracionminuto)}</span>
                     </span>
                     {a.centro_costo_nombre && (
-                      <span className="text-xs text-slate-500 truncate">Centro de Costo: {a.centro_costo_nombre}</span>
+                      <span className="text-xs text-slate-500 truncate">
+                        <span className="text-slate-400">CC:</span> {a.centro_costo_nombre}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -280,6 +346,33 @@ export default function Tareo() {
           canDelete={user?.role === 'admin'}
         />
       )}
+    </div>
+  )
+}
+
+function Toast({ tone, children }) {
+  const cls = tone === 'error'
+    ? 'bg-red-50 border-red-200 text-red-700'
+    : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+  return (
+    <div className={`rounded-md border text-sm px-3 py-2 ${cls}`}>{children}</div>
+  )
+}
+
+function SkeletonList() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="card !p-4 animate-pulse flex items-start gap-3">
+          <div className="w-4 h-4 mt-1 bg-slate-200 rounded" />
+          <div className="w-9 h-9 rounded-full bg-slate-200" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 bg-slate-200 rounded w-1/3" />
+            <div className="h-3 bg-slate-200 rounded w-2/3" />
+            <div className="h-3 bg-slate-200 rounded w-1/2" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
