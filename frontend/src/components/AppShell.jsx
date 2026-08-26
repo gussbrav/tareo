@@ -51,17 +51,17 @@ export default function AppShell() {
               )}
             </div>
             <nav className="hidden sm:flex items-center gap-0.5">
-              <NavLink to="/tareo" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
-                Tareo
-              </NavLink>
-              <NavLink to="/agenda" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
-                Agenda
-              </NavLink>
               <NavLink
                 to="/dashboard"
                 className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}
               >
                 Dashboard
+              </NavLink>
+              <NavLink to="/tareo" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
+                Tareo
+              </NavLink>
+              <NavLink to="/agenda" className={({ isActive }) => `${navBase} ${isActive ? navActive : navInactive}`}>
+                Agenda
               </NavLink>
             </nav>
           </div>
@@ -83,17 +83,17 @@ export default function AppShell() {
 
         {/* nav móvil */}
         <div className="sm:hidden border-t border-slate-100 px-3 py-2 flex items-center gap-2 overflow-x-auto">
-          <NavLink to="/tareo" className={({ isActive }) => `${navBase} shrink-0 ${isActive ? navActive : navInactive}`}>
-            Tareo
-          </NavLink>
-          <NavLink to="/agenda" className={({ isActive }) => `${navBase} shrink-0 ${isActive ? navActive : navInactive}`}>
-            Agenda
-          </NavLink>
           <NavLink
             to="/dashboard"
             className={({ isActive }) => `${navBase} shrink-0 ${isActive ? navActive : navInactive}`}
           >
             Dashboard
+          </NavLink>
+          <NavLink to="/tareo" className={({ isActive }) => `${navBase} shrink-0 ${isActive ? navActive : navInactive}`}>
+            Tareo
+          </NavLink>
+          <NavLink to="/agenda" className={({ isActive }) => `${navBase} shrink-0 ${isActive ? navActive : navInactive}`}>
+            Agenda
           </NavLink>
           {canCreate && (
             <button

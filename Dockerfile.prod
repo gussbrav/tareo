@@ -19,11 +19,14 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TZ=America/Lima
 
-# libs de sistema mínimas para psycopg2-binary + bcrypt
+# libs de sistema mínimas para psycopg2-binary + bcrypt + tzdata (para que TZ tenga efecto)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

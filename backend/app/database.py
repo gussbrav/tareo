@@ -36,11 +36,18 @@ def close_pool() -> None:
 
 @contextmanager
 def get_db() -> Iterator:
-    """Yield una conexión del pool. Commit on success, rollback on error."""
+    """Yield una conexión del pool. Commit on success, rollback on error.
+
+    Fija la zona horaria de la sesión a America/Lima para que CURRENT_DATE,
+    CURRENT_TIMESTAMP y NOW() reflejen la hora local del negocio, no la del
+    contenedor Postgres (que suele estar en UTC).
+    """
     if _pool is None:
         raise RuntimeError("DB pool not initialized. Call init_pool() at startup.")
     conn = _pool.getconn()
     try:
+        with conn.cursor() as cur:
+            cur.execute("SET TIME ZONE 'America/Lima';")
         yield conn
         conn.commit()
     except Exception:

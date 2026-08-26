@@ -7,6 +7,8 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
+      TZ: America/Lima
+      PGTZ: America/Lima
       POSTGRES_USER: tareo_dev
       POSTGRES_PASSWORD: tareo_dev
       POSTGRES_DB: azoramind_tareo
@@ -27,6 +29,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      TZ: America/Lima
       DATABASE_URL: postgresql://tareo_dev:tareo_dev@postgres:5432/azoramind_tareo?sslmode=disable
       JWT_SECRET_KEY: dev_only_secret_change_me_dev_only_secret_change_me
       APP_ENV: development
