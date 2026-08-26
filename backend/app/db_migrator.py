@@ -26,17 +26,25 @@ def _migrations_dir() -> Path:
 
 
 def _ensure_tracker() -> None:
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS public._migrations (
-                    version     text PRIMARY KEY,
-                    filename    text NOT NULL,
-                    applied_at  timestamptz NOT NULL DEFAULT now()
-                );
-                """
-            )
+    # CREATE TABLE IF NOT EXISTS puede tirar duplicate_object si dos workers
+    # corren esto en paralelo (race a nivel catalog). Lo tratamos como no-op:
+    # cualquiera que gane crea la tabla, el resto sigue.
+    from psycopg2 import errors as pg_errors
+
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS public._migrations (
+                        version     text PRIMARY KEY,
+                        filename    text NOT NULL,
+                        applied_at  timestamptz NOT NULL DEFAULT now()
+                    );
+                    """
+                )
+    except pg_errors.DuplicateObject:
+        pass  # ya existe, otro worker la creó primero
 
 
 def _discover() -> List[Tuple[str, Path]]:
@@ -76,27 +84,63 @@ def _discover() -> List[Tuple[str, Path]]:
     return entries
 
 
+# Advisory lock key: entero arbitrario único para este app. Todos los procesos
+# del backend usan el mismo → solo uno aplica migrations a la vez.
+# Evita deadlock cuando uvicorn levanta 2+ workers y ambos intentan aplicar
+# la misma migración simultáneamente (ejemplo real: V013 deploy Aug 2026).
+_MIGRATOR_LOCK_KEY = 4820381_00
+
+
 def apply_all() -> None:
     _ensure_tracker()
 
-    with get_db() as conn:
+    # Tomamos UNA sola conexión para todo el ciclo — el pg_advisory_lock es
+    # session-scoped, así que necesita mantenerse en la misma conexión hasta
+    # el unlock. get_db() haría commit/rollback al salir del with y liberaría
+    # la conexión; acá manejamos el lifecycle manualmente para blindar el lock.
+    from app.database import _pool
+
+    if _pool is None:
+        raise RuntimeError("DB pool not initialized. Call init_pool() at startup.")
+    conn = _pool.getconn()
+    try:
         with conn.cursor() as cur:
-            cur.execute("SELECT version FROM public._migrations;")
-            applied = {row["version"] for row in cur.fetchall()}
+            cur.execute("SET TIME ZONE 'America/Lima';")
+            # Bloqueante: el segundo worker duerme aquí hasta que el primero
+            # termine todas las migrations y libere el lock.
+            cur.execute("SELECT pg_advisory_lock(%s);", (_MIGRATOR_LOCK_KEY,))
+        conn.commit()
 
-    pending = [(v, p) for v, p in _discover() if v not in applied]
-    if not pending:
-        logger.info("[migrator] no hay migraciones pendientes")
-        return
-
-    for version, path in pending:
-        sql = path.read_text(encoding="utf-8")
-        logger.info("[migrator] aplicando %s ...", version)
-        with get_db() as conn:
+        try:
+            # Re-leer applied DENTRO del lock: si el otro worker ya aplicó
+            # todo mientras esperábamos, no reintentamos.
             with conn.cursor() as cur:
-                cur.execute(sql)
-                cur.execute(
-                    "INSERT INTO public._migrations (version, filename) VALUES (%s, %s)",
-                    (version, path.name),
-                )
-        logger.info("[migrator] OK %s", version)
+                cur.execute("SELECT version FROM public._migrations;")
+                applied = {row["version"] for row in cur.fetchall()}
+
+            pending = [(v, p) for v, p in _discover() if v not in applied]
+            if not pending:
+                logger.info("[migrator] no hay migraciones pendientes")
+                return
+
+            for version, path in pending:
+                sql = path.read_text(encoding="utf-8")
+                logger.info("[migrator] aplicando %s ...", version)
+                try:
+                    with conn.cursor() as cur:
+                        cur.execute(sql)
+                        cur.execute(
+                            "INSERT INTO public._migrations (version, filename) VALUES (%s, %s)",
+                            (version, path.name),
+                        )
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    raise
+                logger.info("[migrator] OK %s", version)
+        finally:
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_unlock(%s);", (_MIGRATOR_LOCK_KEY,))
+            conn.commit()
+    finally:
+        _pool.putconn(conn)
