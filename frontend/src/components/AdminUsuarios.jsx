@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { adminApi } from '../api/admin'
+import ConfirmDialog from './admin/ConfirmDialog.jsx'
 import DataTable from './admin/DataTable.jsx'
 import { Icon } from './admin/Icons.jsx'
 import Modal from './admin/Modal.jsx'
@@ -28,6 +29,7 @@ export default function AdminUsuarios() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -84,9 +86,11 @@ export default function AdminUsuarios() {
     }
   }
 
-  const del = async (id, email) => {
-    if (!confirm(`¿Desactivar usuario ${email}?`)) return
-    await adminApi.usuarios.remove(id)
+  const del = (u) => setConfirmingDelete(u)
+
+  const doDelete = async () => {
+    if (!confirmingDelete) return
+    await adminApi.usuarios.remove(confirmingDelete.id)
     load()
   }
 
@@ -134,7 +138,7 @@ export default function AdminUsuarios() {
       {u.is_active && (
         <button
           className="icon-btn-danger"
-          onClick={() => del(u.id, u.email)}
+          onClick={() => del(u)}
           title="Desactivar"
           aria-label="Desactivar"
         >
@@ -256,6 +260,22 @@ export default function AdminUsuarios() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmingDelete}
+        onClose={() => setConfirmingDelete(null)}
+        onConfirm={doDelete}
+        title="Desactivar usuario"
+        message={
+          <>
+            ¿Seguro que querés desactivar el usuario{' '}
+            <strong className="text-slate-900">{confirmingDelete?.email}</strong>?
+            <br />
+            <span className="text-slate-500">No podrá iniciar sesión hasta que lo reactives.</span>
+          </>
+        }
+        confirmLabel="Desactivar"
+      />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { adminApi } from '../api/admin'
+import ConfirmDialog from './admin/ConfirmDialog.jsx'
 import DataTable from './admin/DataTable.jsx'
 import { Icon } from './admin/Icons.jsx'
 import Modal from './admin/Modal.jsx'
@@ -39,6 +40,7 @@ export default function AdminTrabajadores() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -83,9 +85,11 @@ export default function AdminTrabajadores() {
     }
   }
 
-  const del = async (id, nombre) => {
-    if (!confirm(`¿Desactivar a ${nombre}?`)) return
-    await adminApi.trabajadores.remove(id)
+  const del = (t) => setConfirmingDelete(t)
+
+  const doDelete = async () => {
+    if (!confirmingDelete) return
+    await adminApi.trabajadores.remove(confirmingDelete.id)
     load()
   }
 
@@ -143,7 +147,7 @@ export default function AdminTrabajadores() {
       {t.flgativotrabajador && (
         <button
           className="icon-btn-danger"
-          onClick={() => del(t.id, t.nbrcompleto)}
+          onClick={() => del(t)}
           title="Desactivar"
           aria-label="Desactivar"
         >
@@ -241,6 +245,24 @@ export default function AdminTrabajadores() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmingDelete}
+        onClose={() => setConfirmingDelete(null)}
+        onConfirm={doDelete}
+        title="Desactivar trabajador"
+        message={
+          <>
+            ¿Seguro que querés desactivar a{' '}
+            <strong className="text-slate-900">{confirmingDelete?.nbrcompleto}</strong>?
+            <br />
+            <span className="text-slate-500">
+              Ya no aparecerá en el listado de trabajadores disponibles para nuevas actividades.
+            </span>
+          </>
+        }
+        confirmLabel="Desactivar"
+      />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import ConfirmDialog from './admin/ConfirmDialog.jsx'
 import DataTable from './admin/DataTable.jsx'
 import { Icon } from './admin/Icons.jsx'
 import Modal from './admin/Modal.jsx'
@@ -37,6 +38,7 @@ export default function AdminMasterTable({
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [dynOptions, setDynOptions] = useState({})
+  const [confirmingDelete, setConfirmingDelete] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -98,11 +100,15 @@ export default function AdminMasterTable({
     }
   }
 
-  const del = async (row) => {
-    const label = row.nbrarea || row.nbrespecialidad || row.nbrcentrocosto ||
-                  row.nbrproyecto || row.nbrcategoria || row.nbrcompleto || row.email || row.id
-    if (!confirm(`¿Desactivar "${label}"?`)) return
-    await api.remove(row.id)
+  const labelOf = (row) =>
+    row.nbrarea || row.nbrespecialidad || row.nbrcentrocosto ||
+    row.nbrproyecto || row.nbrcategoria || row.nbrcompleto || row.email || `#${row.id}`
+
+  const del = (row) => setConfirmingDelete(row)
+
+  const doDelete = async () => {
+    if (!confirmingDelete) return
+    await api.remove(confirmingDelete.id)
     load()
   }
 
@@ -251,6 +257,21 @@ export default function AdminMasterTable({
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmingDelete}
+        onClose={() => setConfirmingDelete(null)}
+        onConfirm={doDelete}
+        title={`Desactivar ${singular}`}
+        message={
+          <>
+            ¿Seguro que querés desactivar <strong className="text-slate-900">"{confirmingDelete && labelOf(confirmingDelete)}"</strong>?
+            <br />
+            <span className="text-slate-500">Podés reactivarlo desde la lista.</span>
+          </>
+        }
+        confirmLabel="Desactivar"
+      />
     </div>
   )
 }

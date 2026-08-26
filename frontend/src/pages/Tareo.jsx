@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { actividadesApi } from '../api/actividades'
 import { today, fmtHM, minutosToHoras } from '../lib/format'
 import { useAuthStore } from '../store/auth'
+import ConfirmDialog from '../components/admin/ConfirmDialog.jsx'
 import DateField from '../components/admin/DateField.jsx'
 import EditarActividadModal from '../components/EditarActividadModal.jsx'
 import { Icon } from '../components/admin/Icons.jsx'
@@ -36,6 +37,7 @@ export default function Tareo() {
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState(() => new Set())
   const [editing, setEditing] = useState(null)
+  const [deletingActivity, setDeletingActivity] = useState(null)
   const [msg, setMsg] = useState('')
   const [error, setError] = useState('')
 
@@ -120,17 +122,15 @@ export default function Tareo() {
     }
   }
 
-  const removeOne = async (a) => {
-    if (!confirm(`¿Eliminar la actividad de ${a.trabajador_nombre}?\n"${a.desactividad}"\n\nEsta acción no se puede deshacer.`)) return
+  const removeOne = (a) => setDeletingActivity(a)
+
+  const doDelete = async () => {
+    if (!deletingActivity) return
     setError('')
     setMsg('')
-    try {
-      await actividadesApi.eliminar(a.id)
-      setMsg('Actividad eliminada')
-      load()
-    } catch (err) {
-      setError(err.response?.data?.detail || 'No se pudo eliminar')
-    }
+    await actividadesApi.eliminar(deletingActivity.id)
+    setMsg('Actividad eliminada')
+    load()
   }
 
   // ---------- Vista trabajador (mobile-first, minimal) ----------
@@ -374,6 +374,26 @@ export default function Tareo() {
           canDelete={user?.role === 'admin'}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deletingActivity}
+        onClose={() => setDeletingActivity(null)}
+        onConfirm={doDelete}
+        title="Eliminar actividad"
+        message={
+          <>
+            ¿Seguro que querés eliminar la actividad de{' '}
+            <strong className="text-slate-900">{deletingActivity?.trabajador_nombre}</strong>?
+            <br />
+            <span className="italic text-slate-600">"{deletingActivity?.desactividad}"</span>
+            <br />
+            <span className="text-red-600 text-xs mt-2 inline-block">
+              Esta acción no se puede deshacer.
+            </span>
+          </>
+        }
+        confirmLabel="Eliminar"
+      />
     </div>
   )
 }
