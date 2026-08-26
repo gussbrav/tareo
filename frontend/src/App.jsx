@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import Login from './pages/Login.jsx'
+import Agenda from './pages/Agenda.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import NuevaActividad from './pages/NuevaActividad.jsx'
 import Tareo from './pages/Tareo.jsx'
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/tareo" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/tareo" element={<Tareo />} />
+        <Route path="/agenda" element={<Agenda />} />
         <Route
           path="/actividades/nueva"
           element={

@@ -78,6 +78,50 @@ def list_by_date(fecha: date) -> List[Dict[str, Any]]:
         return [dict(r) for r in cur.fetchall()]
 
 
+def list_by_month(
+    year: int,
+    month: int,
+    trabajador_id: Optional[UUID] = None,
+    proyecto_id: Optional[UUID] = None,
+) -> List[Dict[str, Any]]:
+    """Actividades de un mes completo, para vista agenda.
+    Payload mínimo (pensado para renderizar pills de calendario)."""
+    where = ["EXTRACT(YEAR FROM a.fecactividad) = %s", "EXTRACT(MONTH FROM a.fecactividad) = %s"]
+    params: List[Any] = [year, month]
+    if trabajador_id:
+        where.append("a.trabajador_id = %s")
+        params.append(str(trabajador_id))
+    if proyecto_id:
+        where.append("a.proyecto_id = %s")
+        params.append(str(proyecto_id))
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"""
+            SELECT a.id,
+                   TO_CHAR(a.fecactividad, 'YYYY-MM-DD') AS fecha_dia,
+                   a.trabajador_id,
+                   t.nbrcompleto AS trabajador_nombre,
+                   a.desactividad,
+                   a.horinicio::time AS horinicio,
+                   a.horfin::time AS horfin,
+                   a.desestadoactividad,
+                   a.numduracionminuto,
+                   a.proyecto_id,
+                   p.nbrproyecto AS proyecto_nombre,
+                   a.centro_costo_id,
+                   cc.nbrcentrocosto AS centro_costo_nombre
+              FROM construccion.m_actividad a
+              JOIN construccion.m_trabajador t ON t.id = a.trabajador_id
+              LEFT JOIN construccion.m_centrocosto cc ON cc.id = a.centro_costo_id
+              LEFT JOIN construccion.m_proyecto p ON p.id = a.proyecto_id
+             WHERE {' AND '.join(where)}
+             ORDER BY a.fecactividad, a.horinicio NULLS LAST, a.created_at;
+            """,
+            tuple(params),
+        )
+        return [dict(r) for r in cur.fetchall()]
+
+
 def list_by_trabajador(trabajador_id: UUID, fecha: date) -> List[Dict[str, Any]]:
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(

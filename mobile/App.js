@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import AgendaScreen from './src/screens/AgendaScreen'
 import EditarActividadScreen from './src/screens/EditarActividadScreen'
 import HomeScreen from './src/screens/HomeScreen'
 import LoginScreen from './src/screens/LoginScreen'
@@ -32,9 +33,14 @@ function TareoStackNav() {
       }}
     >
       <TareoStack.Screen
+        name="Agenda"
+        component={AgendaScreen}
+        options={{ title: 'Agenda' }}
+      />
+      <TareoStack.Screen
         name="Tareo"
         component={TareoScreen}
-        options={{ title: 'Actividades' }}
+        options={{ title: 'Vista simple' }}
       />
       <TareoStack.Screen
         name="NuevaActividad"
@@ -53,7 +59,7 @@ function TareoStackNav() {
 // ─── Icono para tab bar (SVG outline, family Lucide-style) ────────────────
 const ICON_NAME = {
   Home: 'home',
-  TareoStack: 'clipboardCheck',
+  TareoStack: 'calendar',
   Reportes: 'barChart',
   Mas: 'dotsHorizontal',
 }
@@ -109,7 +115,7 @@ function MainTabs() {
         name="TareoStack"
         component={TareoStackNav}
         options={{
-          title: 'Tareo',
+          title: 'Agenda',
           tabBarIcon: ({ focused }) => <TabIcon name="TareoStack" focused={focused} />,
         }}
       />

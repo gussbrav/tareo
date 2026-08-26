@@ -54,6 +54,32 @@ def list_for_user(fecha: date, user: UserPublic) -> List[Dict[str, Any]]:
     return repo.list_by_date(fecha)
 
 
+def list_month_for_user(
+    year: int,
+    month: int,
+    user: UserPublic,
+    trabajador_id: Optional[UUID] = None,
+    proyecto_id: Optional[UUID] = None,
+) -> Dict[str, Any]:
+    """Vista agenda: todas las actividades del mes con filtros opcionales.
+    Trabajador siempre ve sólo las suyas (ignora filtro trabajador_id)."""
+    if user.role == "trabajador":
+        if not user.trabajador_id:
+            return {"actividades": []}
+        actividades = repo.list_by_month(
+            year=year, month=month,
+            trabajador_id=user.trabajador_id,
+            proyecto_id=proyecto_id,
+        )
+    else:
+        actividades = repo.list_by_month(
+            year=year, month=month,
+            trabajador_id=trabajador_id,
+            proyecto_id=proyecto_id,
+        )
+    return {"actividades": actividades}
+
+
 def get_detail(actividad_id: UUID, user: UserPublic) -> Dict[str, Any]:
     row = repo.get_by_id(actividad_id)
     if not row:

@@ -33,6 +33,22 @@ def listar(
     return svc.list_for_user(fecha, user)
 
 
+@router.get("/mes")
+def listar_mes(
+    mes: str = Query(..., pattern=r"^\d{4}-\d{2}$", description="Mes YYYY-MM"),
+    trabajador_id: UUID | None = Query(default=None),
+    proyecto_id: UUID | None = Query(default=None),
+    user: UserPublic = Depends(get_current_user),
+):
+    """Vista agenda: actividades del mes completo con filtros opcionales.
+    Payload optimizado para renderizar pills en grilla mensual."""
+    year, month = mes.split("-")
+    return svc.list_month_for_user(
+        year=int(year), month=int(month), user=user,
+        trabajador_id=trabajador_id, proyecto_id=proyecto_id,
+    )
+
+
 @router.get("/{actividad_id}", response_model=ActividadDetalle)
 def detalle(actividad_id: UUID, user: UserPublic = Depends(get_current_user)):
     return svc.get_detail(actividad_id, user)
