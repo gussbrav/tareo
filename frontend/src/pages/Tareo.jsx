@@ -28,6 +28,7 @@ export default function Tareo() {
   const { user } = useAuthStore()
   const isTrabajador = user?.role === 'trabajador'
   const canEdit = user?.role === 'admin' || user?.role === 'supervisor'
+  const canDelete = user?.role === 'admin'
 
   const [fecha, setFecha] = useState(today())
   const [items, setItems] = useState([])
@@ -115,6 +116,19 @@ export default function Tareo() {
     }
   }
 
+  const removeOne = async (a) => {
+    if (!confirm(`¿Eliminar la actividad de ${a.trabajador_nombre}?\n"${a.desactividad}"\n\nEsta acción no se puede deshacer.`)) return
+    setError('')
+    setMsg('')
+    try {
+      await actividadesApi.eliminar(a.id)
+      setMsg('Actividad eliminada')
+      load()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'No se pudo eliminar')
+    }
+  }
+
   // ---------- Vista trabajador (mobile-first, minimal) ----------
   if (isTrabajador) {
     return (
@@ -188,17 +202,11 @@ export default function Tareo() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Registro de tareo</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            {items.length} {items.length === 1 ? 'actividad' : 'actividades'} · {fecha}
-          </p>
-        </div>
-        <button className="btn-primary btn-sm" onClick={() => navigate('/actividades/nueva')}>
-          <Icon.Plus className="w-4 h-4" />
-          Nueva actividad
-        </button>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Registro de tareo</h1>
+        <p className="text-slate-500 text-sm mt-1">
+          {items.length} {items.length === 1 ? 'actividad' : 'actividades'} · {fecha}
+        </p>
       </div>
 
       {/* Filtros */}
@@ -310,18 +318,34 @@ export default function Tareo() {
                           <Icon.Edit className="w-4 h-4" />
                         </button>
                       )}
+                      {canDelete && (
+                        <button
+                          onClick={() => removeOne(a)}
+                          className="icon-btn-danger"
+                          title="Eliminar"
+                          aria-label="Eliminar"
+                        >
+                          <Icon.Archive className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <StatusPill tone={stateTone(a.desestadoactividad)}>
                       {a.desestadoactividad}
                     </StatusPill>
-                    <span className="text-xs text-slate-500 tabular-nums">
-                      {fmtHM(a.horinicio)}
-                      {' → '}
-                      {fmtHM(a.horfin)}
-                      <span className="text-slate-400"> · {minutosToHoras(a.numduracionminuto)}</span>
-                    </span>
+                    {a.desestadoactividad === 'iniciado' ? (
+                      <span className="text-xs text-slate-500 tabular-nums">
+                        <span className="text-slate-400">Desde</span> {fmtHM(a.horinicio)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-500 tabular-nums">
+                        {fmtHM(a.horinicio)}
+                        {' → '}
+                        {fmtHM(a.horfin)}
+                        <span className="text-slate-400"> · {minutosToHoras(a.numduracionminuto)}</span>
+                      </span>
+                    )}
                     {a.centro_costo_nombre && (
                       <span className="text-xs text-slate-500 truncate">
                         <span className="text-slate-400">CC:</span> {a.centro_costo_nombre}
