@@ -206,7 +206,7 @@ export default function AgendaScreen({ navigation }) {
                 <Icon name="calendar" size={22} color={colors.text.muted} />
               </View>
               <Text style={styles.emptyText}>Sin actividades este día</Text>
-              <Text style={styles.emptyHint}>Tocá otro día en la semana o creá una nueva.</Text>
+              <Text style={styles.emptyHint}>Toca otro día en la semana o crea una nueva.</Text>
             </View>
           }
           renderItem={({ item }) => {
