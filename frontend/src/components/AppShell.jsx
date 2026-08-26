@@ -110,8 +110,6 @@ export default function AppShell() {
       <main className="flex-1 max-w-6xl w-full mx-auto p-4">
         <Outlet />
       </main>
-
-      <footer className="text-center text-xs text-slate-400 py-4">Azoramind Tareo · v0.1.0</footer>
     </div>
   )
 }

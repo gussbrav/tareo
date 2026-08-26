@@ -1,21 +1,17 @@
 /**
  * Agenda — Vista calendaria (mes/semana/lista) de actividades.
  *
- * Vistas:
- *   - Mes: grilla 7×6 que llena el viewport (sin scroll externo)
- *   - Semana: 7 columnas con cards apiladas por día (scroll vertical interno)
- *   - Lista: grouped por día (scroll vertical interno)
+ * Mes:    grilla 7×N que llena el viewport (sin scroll externo)
+ * Semana: time-grid estilo Google Calendar (eje horario vertical + línea "ahora")
+ * Lista:  agrupado por día con scroll interno
  *
- * Agrupación (groupBy):
+ * groupBy:
  *   - "trabajador" → un pill por asignación individual
- *   - "actividad"  → un pill por descripción única, con contador "N×"
+ *   - "actividad"  → colapsa por descripción con badge "N×"
  *
- * Colores (convención de monitoreo, unificada en toda la app):
- *   - iniciado   → emerald  (activo, en curso)
- *   - finalizado → slate    (histórico, no requiere atención)
- *
- * Read-only para trabajador; admin/supervisor pueden abrir EditarActividadModal.
- * Polling silencioso 20s + refresh al volver a la pestaña.
+ * Colores (convención de monitoreo, unificada):
+ *   - iniciado   → emerald (activo)
+ *   - finalizado → slate   (histórico)
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -25,7 +21,7 @@ import EditarActividadModal from '../components/EditarActividadModal.jsx'
 import { Icon } from '../components/admin/Icons.jsx'
 import StatusPill from '../components/admin/StatusPill.jsx'
 import { useAuthStore } from '../store/auth'
-import { fmtHM, minutosToHoras } from '../lib/format'
+import { fmtHM } from '../lib/format'
 
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 const MESES = [
@@ -34,20 +30,17 @@ const MESES = [
 ]
 
 const ESTADO_STYLE = {
-  iniciado:   { bg: 'bg-emerald-500', text: 'text-white', tone: 'emerald' },
-  finalizado: { bg: 'bg-slate-400',   text: 'text-white', tone: 'slate' },
+  iniciado:   { bg: 'bg-emerald-500', text: 'text-white', tone: 'emerald', ring: 'ring-emerald-400' },
+  finalizado: { bg: 'bg-slate-400',   text: 'text-white', tone: 'slate',   ring: 'ring-slate-300' },
 }
 const getEstadoStyle = (estado) =>
   ESTADO_STYLE[(estado || '').toLowerCase()] || { bg: 'bg-slate-300', text: 'text-white', tone: 'slate' }
 
+// ─── Helpers de fecha/hora ────────────────────────────────────────────────
+
 function getLocalToday() {
   const d = new Date()
-  return {
-    year: d.getFullYear(),
-    month: d.getMonth() + 1,
-    day: d.getDate(),
-    iso: isoOf(d),
-  }
+  return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(), iso: isoOf(d) }
 }
 
 function isoOf(d) {
@@ -77,24 +70,31 @@ function buildMonthCells(year, month) {
   const daysInMonth = new Date(year, month, 0).getDate()
   const prevDays = new Date(year, month - 1, 0).getDate()
   const cells = []
-  for (let i = startDow - 1; i >= 0; i--) {
-    cells.push({ day: prevDays - i, current: false, key: `prev-${i}` })
-  }
+  for (let i = startDow - 1; i >= 0; i--) cells.push({ day: prevDays - i, current: false, key: `prev-${i}` })
   for (let d = 1; d <= daysInMonth; d++) {
     const iso = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
     cells.push({ day: d, current: true, key: iso, iso })
   }
   let next = 1
-  while (cells.length % 7 !== 0) {
-    cells.push({ day: next++, current: false, key: `next-${next}` })
-  }
+  while (cells.length % 7 !== 0) cells.push({ day: next++, current: false, key: `next-${next}` })
   return cells
 }
 
-// ─── Agrupación por actividad ──────────────────────────────────────────────
-// Cuando groupBy=actividad, cada día devuelve un item por descripción única
-// con { count, _items, _trabajadores } para renderizar "N× {actividad}".
+/** "14:30:00" o "14:30" → 870 (minutos desde 00:00). */
+function timeToMinutes(t) {
+  if (!t) return null
+  const [h, m] = String(t).split(':').map(Number)
+  if (Number.isNaN(h)) return null
+  return h * 60 + (m || 0)
+}
 
+function fmtHour12(h) {
+  const suffix = h >= 12 ? 'PM' : 'AM'
+  const disp = h === 0 ? 12 : h > 12 ? h - 12 : h
+  return `${disp} ${suffix}`
+}
+
+// ─── Agrupación por descripción única ─────────────────────────────────────
 function collapseByActividad(actividades) {
   const map = new Map()
   for (const a of actividades) {
@@ -126,8 +126,9 @@ function collapseByActividad(actividades) {
   }))
 }
 
-// ─── Pill compacto (Mes) ───────────────────────────────────────────────────
-function ActividadPill({ item, groupBy, onOpen }) {
+// ─── Pills / Cards ─────────────────────────────────────────────────────────
+
+function MonthPill({ item, groupBy, onOpen }) {
   const { bg, text } = getEstadoStyle(item.desestadoactividad)
   const hora = fmtHM(item.horinicio)
   const label = groupBy === 'actividad'
@@ -137,10 +138,8 @@ function ActividadPill({ item, groupBy, onOpen }) {
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); onOpen?.(item) }}
-      className={`block w-full text-left rounded px-1.5 py-[1px] text-[10px] font-medium truncate
-                  transition-all cursor-pointer hover:brightness-110 hover:shadow-sm
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white
-                  focus-visible:ring-offset-1 focus-visible:ring-offset-brand-500
+      className={`block w-full text-left rounded px-1 py-0 text-[10px] font-medium truncate leading-[15px]
+                  transition-all cursor-pointer hover:brightness-110
                   ${bg} ${text}`}
       title={groupBy === 'actividad'
         ? `${item.desactividad} · ${item.trabajador_nombre}`
@@ -148,7 +147,7 @@ function ActividadPill({ item, groupBy, onOpen }) {
     >
       <div className="flex items-center gap-1 truncate">
         {groupBy === 'actividad' && item.count > 1 && (
-          <span className="shrink-0 opacity-80 tabular-nums">{item.count}×</span>
+          <span className="shrink-0 opacity-90 tabular-nums font-semibold">{item.count}×</span>
         )}
         {hora && <span className="opacity-75 shrink-0 tabular-nums">{hora}</span>}
         <span className="truncate">{label}</span>
@@ -157,7 +156,6 @@ function ActividadPill({ item, groupBy, onOpen }) {
   )
 }
 
-// ─── Card (Semana / Lista / DayPanel) ──────────────────────────────────────
 function ActividadCard({ item, groupBy, onOpen }) {
   const { tone } = getEstadoStyle(item.desestadoactividad)
   const isGroup = !!item.isGroup
@@ -203,13 +201,13 @@ function ActividadCard({ item, groupBy, onOpen }) {
 // ─── VIEW: Mes ─────────────────────────────────────────────────────────────
 function MonthView({ year, month, itemsByDay, selectedDay, setSelectedDay, today, groupBy, onOpen, onOpenDay }) {
   const cells = useMemo(() => buildMonthCells(year, month), [year, month])
-  const rows = cells.length / 7 // 5 o 6
+  const rows = cells.length / 7
 
   return (
     <div className="card-flush h-full flex flex-col">
-      <div className="grid grid-cols-7 border-b border-slate-100 shrink-0">
+      <div className="grid grid-cols-7 border-b border-slate-100 shrink-0 bg-slate-50/40">
         {DIAS.map((d) => (
-          <div key={d} className="py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          <div key={d} className="py-1 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400">
             {d}
           </div>
         ))}
@@ -223,10 +221,8 @@ function MonthView({ year, month, itemsByDay, selectedDay, setSelectedDay, today
           const isSelected = cell.current && cell.iso === selectedDay
           const dayItems = cell.iso ? (itemsByDay[cell.iso] || []) : []
           const total = dayItems.length
-          // Cuántos pills caben depende de la altura de la celda.
-          // Usamos un límite conservador — el resto se muestra como "+N más"
-          // que abre el DayPanel.
-          const MAX = 3
+          // Mostrar hasta 4 pills; el resto como "+N" compacto.
+          const MAX = 4
           const shown = dayItems.slice(0, MAX)
           const extras = Math.max(0, total - MAX)
           const borders = idx % 7 !== 0 ? 'border-l border-slate-100' : ''
@@ -236,33 +232,30 @@ function MonthView({ year, month, itemsByDay, selectedDay, setSelectedDay, today
               onClick={() => cell.current && setSelectedDay(isSelected ? null : cell.iso)}
               className={`p-1 flex flex-col gap-0.5 border-b border-slate-100 overflow-hidden ${borders}
                           ${cell.current ? 'cursor-pointer hover:bg-slate-50/60' : 'bg-slate-50/40 cursor-default'}
-                          ${isSelected ? 'bg-brand-50/60 hover:bg-brand-50/60' : ''}`}
+                          ${isSelected ? 'bg-brand-50/70 hover:bg-brand-50/70' : ''}`}
             >
-              <div className="flex items-center justify-between shrink-0">
-                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[11px] font-semibold
+              <div className="flex items-center justify-between shrink-0 h-4">
+                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-semibold
                                   ${isToday ? 'bg-brand-600 text-white' : ''}
                                   ${!isToday && cell.current ? 'text-slate-700' : ''}
                                   ${!cell.current ? 'text-slate-300' : ''}
                                   ${isSelected && !isToday ? 'text-brand-700' : ''}`}>
                   {cell.day}
                 </span>
-                {total > 0 && (
-                  <span className="text-[9px] font-bold text-brand-700 bg-brand-50 px-1 rounded-full tabular-nums leading-none py-[3px]">
-                    {total}
-                  </span>
-                )}
               </div>
-              <div className="space-y-0.5 flex-1 min-h-0 overflow-hidden">
+              <div className="space-y-[2px] flex-1 min-h-0 overflow-hidden">
                 {shown.map((it) => (
-                  <ActividadPill key={it.id} item={it} groupBy={groupBy} onOpen={onOpen} />
+                  <MonthPill key={it.id} item={it} groupBy={groupBy} onOpen={onOpen} />
                 ))}
                 {extras > 0 && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onOpenDay(cell.iso) }}
-                    className="text-[10px] text-slate-500 font-medium pl-1 hover:text-brand-600 hover:underline transition-colors block"
+                    className="inline-block text-[10px] font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100
+                               px-1.5 py-0 rounded tabular-nums leading-[14px] transition-colors"
+                    title={`Ver ${extras} más`}
                   >
-                    +{extras} más
+                    +{extras}
                   </button>
                 )}
               </div>
@@ -274,19 +267,64 @@ function MonthView({ year, month, itemsByDay, selectedDay, setSelectedDay, today
   )
 }
 
-// ─── VIEW: Semana ──────────────────────────────────────────────────────────
+// ─── VIEW: Semana (time-grid estilo Google Calendar) ──────────────────────
+
+const HOUR_HEIGHT = 44 // px por hora
+const START_HOUR = 6
+const END_HOUR = 22
+const HOURS = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i)
+
+function nowMinutesLocal() {
+  const d = new Date()
+  return d.getHours() * 60 + d.getMinutes()
+}
+
 function WeekView({ anchor, itemsByDay, today, groupBy, onOpen }) {
   const week = useMemo(() => weekOf(new Date(anchor + 'T12:00:00')), [anchor])
+  const [nowMin, setNowMin] = useState(nowMinutesLocal())
+  const scrollRef = useRef(null)
+
+  // Actualiza la línea roja cada minuto
+  useEffect(() => {
+    const id = setInterval(() => setNowMin(nowMinutesLocal()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  // Auto-scroll a "ahora" al montar (o a 8 AM si estamos fuera del rango visible)
+  useEffect(() => {
+    if (!scrollRef.current) return
+    const target = nowMin >= START_HOUR * 60 && nowMin <= END_HOUR * 60
+      ? nowMin - START_HOUR * 60 - 90 // 1.5h de contexto arriba
+      : (8 - START_HOUR) * 60         // 8 AM por default
+    scrollRef.current.scrollTop = Math.max(0, (target / 60) * HOUR_HEIGHT)
+    // solo mount — anchor changes handled below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Cuando cambia la semana anclada, scrollear también
+  useEffect(() => {
+    if (!scrollRef.current) return
+    scrollRef.current.scrollTop = Math.max(0, ((8 - START_HOUR) * 60 / 60) * HOUR_HEIGHT)
+  }, [anchor])
+
+  const totalHeight = HOURS.length * HOUR_HEIGHT
+
+  const nowVisible = nowMin >= START_HOUR * 60 && nowMin <= END_HOUR * 60
+  const nowTop = nowVisible ? ((nowMin - START_HOUR * 60) / 60) * HOUR_HEIGHT : 0
+
   return (
     <div className="card-flush h-full flex flex-col overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-slate-100 min-w-[720px] shrink-0">
+      {/* Header de días */}
+      <div className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] border-b border-slate-100 shrink-0">
+        <div className="border-r border-slate-100" />
         {week.map((d) => {
           const iso = isoOf(d)
           const isToday = iso === today.iso
+          const dowLabel = DIAS[d.getDay() === 0 ? 6 : d.getDay() - 1]
           return (
-            <div key={iso} className="py-2 px-2 text-center border-l border-slate-100 first:border-l-0">
+            <div key={iso} className="py-1.5 text-center border-l border-slate-100 first:border-l-0">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                {DIAS[d.getDay() === 0 ? 6 : d.getDay() - 1]}
+                {dowLabel}
               </div>
               <div className={`mt-0.5 inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-semibold
                                 ${isToday ? 'bg-brand-600 text-white' : 'text-slate-700'}`}>
@@ -296,34 +334,129 @@ function WeekView({ anchor, itemsByDay, today, groupBy, onOpen }) {
           )
         })}
       </div>
-      <div className="grid grid-cols-7 min-w-[720px] overflow-y-auto flex-1">
-        {week.map((d, idx) => {
-          const iso = isoOf(d)
-          const items = itemsByDay[iso] || []
-          const borders = idx > 0 ? 'border-l border-slate-100' : ''
-          return (
-            <div key={iso} className={`p-2 space-y-1.5 ${borders}`}>
-              {items.length === 0 ? (
-                <div className="h-full min-h-[120px] flex items-center justify-center text-[11px] text-slate-300">
-                  —
-                </div>
-              ) : (
-                items.map((it) => (
-                  <ActividadCard key={it.id} item={it} groupBy={groupBy} onOpen={onOpen} />
-                ))
-              )}
-            </div>
-          )
-        })}
+
+      {/* Scrollable body */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div
+          className="grid grid-cols-[56px_repeat(7,minmax(0,1fr))] relative"
+          style={{ height: totalHeight }}
+        >
+          {/* Eje horario */}
+          <div className="border-r border-slate-100 relative">
+            {HOURS.map((h) => (
+              <div key={h} style={{ height: HOUR_HEIGHT }} className="relative">
+                <span className="absolute -top-1.5 right-1.5 text-[10px] text-slate-400 tabular-nums leading-none">
+                  {fmtHour12(h)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Columnas por día */}
+          {week.map((d) => {
+            const iso = isoOf(d)
+            const items = itemsByDay[iso] || []
+            const isToday = iso === today.iso
+            return (
+              <div key={iso} className="relative border-l border-slate-100 first:border-l-0">
+                {/* Líneas de hora (fondo) */}
+                {HOURS.map((h, i) => (
+                  <div
+                    key={h}
+                    style={{ height: HOUR_HEIGHT }}
+                    className={`border-t ${i === 0 ? 'border-transparent' : 'border-slate-100'}`}
+                  />
+                ))}
+                {/* Eventos */}
+                {items.map((it) => (
+                  <WeekEvent key={it.id} item={it} groupBy={groupBy} onOpen={onOpen} />
+                ))}
+                {/* Línea "ahora" (solo en la columna del día actual) */}
+                {isToday && nowVisible && (
+                  <div
+                    className="absolute inset-x-0 pointer-events-none z-10"
+                    style={{ top: nowTop }}
+                  >
+                    <div className="relative">
+                      <span className="absolute -left-1 -top-1 w-2 h-2 rounded-full bg-red-500 shadow-sm" />
+                      <div className="h-[1.5px] bg-red-500" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
 }
 
-// ─── VIEW: Lista ───────────────────────────────────────────────────────────
+function WeekEvent({ item, groupBy, onOpen }) {
+  const startMin = timeToMinutes(item.horinicio)
+  if (startMin == null) return null
+  const endMin = timeToMinutes(item.horfin) || (startMin + 30)
+  // Clipeamos a la ventana visible
+  const clampedStart = Math.max(START_HOUR * 60, startMin)
+  const clampedEnd = Math.min(END_HOUR * 60, Math.max(endMin, startMin + 15))
+  if (clampedEnd <= START_HOUR * 60 || clampedStart >= END_HOUR * 60) return null
+
+  const top = ((clampedStart - START_HOUR * 60) / 60) * HOUR_HEIGHT
+  const height = Math.max(16, ((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT)
+
+  const { bg, text } = getEstadoStyle(item.desestadoactividad)
+  const label = groupBy === 'actividad'
+    ? (item.desactividad || 'Sin descripción')
+    : item.trabajador_nombre
+
+  const isShort = height < 26
+
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen?.(item)}
+      style={{ top, height, left: 2, right: 2 }}
+      className={`absolute rounded-md px-1.5 text-left overflow-hidden shadow-sm
+                  transition-all hover:brightness-110 hover:shadow
+                  ${bg} ${text} ${isShort ? 'py-0' : 'py-1'}`}
+      title={`${item.trabajador_nombre} · ${item.desactividad || ''}`}
+    >
+      <div className={`flex items-center gap-1 ${isShort ? 'text-[9px]' : 'text-[10px]'} font-semibold truncate leading-tight`}>
+        {groupBy === 'actividad' && item.count > 1 && (
+          <span className="opacity-90 tabular-nums shrink-0">{item.count}×</span>
+        )}
+        <span className="tabular-nums opacity-90 shrink-0">{fmtHM(item.horinicio)}</span>
+        <span className="truncate">{label}</span>
+      </div>
+      {!isShort && groupBy === 'trabajador' && item.desactividad && (
+        <div className="text-[9px] opacity-90 truncate leading-tight mt-0.5">{item.desactividad}</div>
+      )}
+    </button>
+  )
+}
+
+// ─── VIEW: Lista (estilo Gmail/CRM — filas flat) ──────────────────────────
+const DIAS_CORTOS_LC = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
+const MESES_CORTOS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
+function fmtDateLabel(iso) {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dateObj = new Date(y, m - 1, d)
+  const dow = DIAS_CORTOS_LC[dateObj.getDay()]
+  return `${dow.charAt(0).toUpperCase() + dow.slice(1)}, ${String(d).padStart(2, '0')} ${MESES_CORTOS[m - 1]}.`
+}
+
 function ListView({ itemsByDay, groupBy, onOpen }) {
-  const days = Object.keys(itemsByDay).sort()
-  if (days.length === 0) {
+  // Flatten a lista lineal ordenada por fecha + hora
+  const rows = useMemo(() => {
+    const out = []
+    for (const iso of Object.keys(itemsByDay).sort()) {
+      for (const it of itemsByDay[iso]) out.push(it)
+    }
+    return out
+  }, [itemsByDay])
+
+  if (rows.length === 0) {
     return (
       <div className="card-flush h-full flex items-center justify-center">
         <div className="text-center py-14 px-6">
@@ -335,40 +468,68 @@ function ListView({ itemsByDay, groupBy, onOpen }) {
       </div>
     )
   }
+
   return (
     <div className="card-flush h-full overflow-y-auto divide-y divide-slate-100">
-      {days.map((iso) => {
-        const [y, m, d] = iso.split('-').map(Number)
-        const dateObj = new Date(y, m - 1, d)
-        const dow = dateObj.getDay()
-        const dowLabel = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][dow]
-        const items = itemsByDay[iso]
+      {rows.map((it) => {
+        const { tone } = getEstadoStyle(it.desestadoactividad)
+        const isGroup = !!it.isGroup
+        const primary = groupBy === 'actividad'
+          ? (it.desactividad || 'Sin descripción')
+          : it.trabajador_nombre
+        const secondaryParts = []
+        if (groupBy === 'actividad') {
+          secondaryParts.push(it.trabajador_nombre)
+        } else if (it.desactividad) {
+          secondaryParts.push(it.desactividad)
+        }
+        if (it.centro_costo_nombre) secondaryParts.push(`CC: ${it.centro_costo_nombre}`)
+        const secondary = secondaryParts.join(' · ')
+
         return (
-          <div key={iso}>
-            <div className="px-4 py-2 bg-slate-50/70 flex items-center justify-between sticky top-0 z-[1]">
-              <div className="flex items-baseline gap-2">
-                <span className="text-sm font-semibold text-slate-900">
-                  {d} {MESES[m - 1]}
-                </span>
-                <span className="text-xs text-slate-500">{dowLabel}</span>
+          <button
+            key={it.id}
+            type="button"
+            onClick={() => onOpen?.(it)}
+            className="w-full text-left flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors"
+          >
+            {/* Hora + fecha */}
+            <div className="w-[92px] shrink-0 tabular-nums">
+              <div className="text-sm font-semibold text-slate-900 leading-tight">
+                {fmtHM(it.horinicio) || '—'}
               </div>
-              <span className="text-[11px] text-slate-500 tabular-nums">
-                {items.length} {items.length === 1 ? 'item' : 'items'}
-              </span>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                {fmtDateLabel(it.fecha_dia)}
+              </div>
             </div>
-            <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-              {items.map((it) => (
-                <ActividadCard key={it.id} item={it} groupBy={groupBy} onOpen={onOpen} />
-              ))}
+
+            {/* Título + subtítulo */}
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-slate-900 truncate flex items-center gap-1.5">
+                {isGroup && it.count > 1 && (
+                  <span className="text-[10px] font-semibold text-brand-700 bg-brand-50 px-1.5 py-0.5 rounded tabular-nums shrink-0">
+                    {it.count}×
+                  </span>
+                )}
+                {primary}
+              </div>
+              {secondary && (
+                <div className="text-xs text-slate-500 truncate mt-0.5">{secondary}</div>
+              )}
             </div>
-          </div>
+
+            {/* Pill de estado a la derecha */}
+            <div className="shrink-0">
+              <StatusPill tone={tone}>{it.desestadoactividad}</StatusPill>
+            </div>
+          </button>
         )
       })}
     </div>
   )
 }
 
-// ─── Panel lateral (día seleccionado, solo vista Mes) ──────────────────────
+// ─── Panel lateral (día seleccionado, solo Mes) ───────────────────────────
 function DayPanel({ date, items, groupBy, onClose, onOpen }) {
   if (!date) return null
   const [y, m, d] = date.split('-').map(Number)
@@ -397,7 +558,7 @@ function DayPanel({ date, items, groupBy, onClose, onOpen }) {
   )
 }
 
-// ─── Segmented control ─────────────────────────────────────────────────────
+// ─── Segmented control ────────────────────────────────────────────────────
 function Segmented({ value, onChange, options, size = 'md' }) {
   const cls = size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-xs'
   return (
@@ -498,7 +659,6 @@ export default function Agenda() {
   }
   const goToday = () => { setAnchor(today.iso); setSelectedDay(view === 'mes' ? today.iso : null) }
 
-  // Actividades crudas → índice por día
   const actsByDay = useMemo(() => {
     const m = {}
     for (const a of actividades) {
@@ -509,7 +669,6 @@ export default function Agenda() {
     return m
   }, [actividades])
 
-  // Items renderizados: raw (trabajador) o colapsados por descripción (actividad)
   const itemsByDay = useMemo(() => {
     if (groupBy !== 'actividad') return actsByDay
     const out = {}
@@ -519,7 +678,6 @@ export default function Agenda() {
     return out
   }, [actsByDay, groupBy])
 
-  // Para el DayPanel siempre mostramos individuales (drill-down claro).
   const selectedRaw = selectedDay ? (actsByDay[selectedDay] || []) : []
 
   const iniciadas = actividades.filter((a) => a.desestadoactividad === 'iniciado').length
@@ -527,8 +685,6 @@ export default function Agenda() {
 
   const handleOpen = (item) => {
     if (!canManage) return
-    // Si es un grupo (varias asignaciones de la misma actividad), abrir el
-    // panel del día en vez del modal — el usuario elige cuál trabajador editar.
     if (item.isGroup) {
       setSelectedDay(item.fecha_dia)
       return
@@ -548,13 +704,10 @@ export default function Agenda() {
       })()
     : `${MESES[month - 1]} ${year}`
 
-  // Layout no-scroll para la vista Mes: fija la altura del contenedor al
-  // viewport disponible menos el chrome del AppShell (header 56 + padding
-  // + footer ~ 130px). Usamos 100dvh para respetar el chrome del navegador
-  // móvil. Las demás vistas también se benefician (scroll interno).
+  // Sin footer del AppShell: chrome = 56 (header) + 32 (main padding).
+  // Ajustamos con 100dvh - 5.5rem (88px) para llenar exacto.
   return (
-    <div className="flex flex-col h-[calc(100dvh-8rem)] min-h-[560px] overflow-hidden gap-3">
-      {/* Header compacto (single row on desktop) */}
+    <div className="flex flex-col h-[calc(100dvh-5.5rem)] min-h-[560px] overflow-hidden gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="flex items-baseline gap-3 flex-wrap min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 leading-none">Agenda</h1>
@@ -596,7 +749,6 @@ export default function Agenda() {
         </div>
       </div>
 
-      {/* Toolbar: view + groupBy + filtros */}
       <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
           <Segmented
@@ -655,7 +807,6 @@ export default function Agenda() {
         </div>
       )}
 
-      {/* Cuerpo: llena el espacio restante */}
       <div className="flex gap-3 items-stretch flex-1 min-h-0">
         <div className="flex-1 min-w-0 min-h-0">
           {view === 'mes' && (
