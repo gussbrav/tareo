@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { reportesApi } from '../api/reportes'
 import { useAuthStore } from '../store/auth'
 import { today } from '../lib/format'
+import DateField from '../components/admin/DateField.jsx'
 import KpiCard from '../components/dashboard/KpiCard'
 import TendenciaChart from '../components/dashboard/TendenciaChart'
 import RankingList from '../components/dashboard/RankingList'
@@ -278,9 +279,8 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Desde</label>
-            <input
-              type="date"
-              className="input text-sm py-1.5"
+            <DateField
+              className="text-sm py-1.5"
               value={filtro.desde}
               onChange={(e) => {
                 setPresetActivo(null)
@@ -290,9 +290,8 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">Hasta</label>
-            <input
-              type="date"
-              className="input text-sm py-1.5"
+            <DateField
+              className="text-sm py-1.5"
               value={filtro.hasta}
               onChange={(e) => {
                 setPresetActivo(null)

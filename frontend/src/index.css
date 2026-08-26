@@ -106,6 +106,34 @@
   .toolbar {
     @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4;
   }
+
+  /* Date field ----------------------------------------------------- */
+  .date-field { @apply relative inline-block w-full; }
+  .date-field-input {
+    /* oculta ícono nativo del picker en WebKit/Chromium */
+    color-scheme: light;
+  }
+  .date-field-input::-webkit-calendar-picker-indicator {
+    opacity: 0;
+    display: block;
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+  .date-field-input::-webkit-inner-spin-button,
+  .date-field-input::-webkit-clear-button { display: none; }
+  .date-field-btn {
+    @apply absolute right-1.5 top-1/2 -translate-y-1/2
+           inline-flex items-center justify-center w-7 h-7 rounded-md
+           text-slate-500 hover:text-slate-900 hover:bg-slate-100
+           transition-colors cursor-pointer
+           focus:outline-none focus:ring-2 focus:ring-brand-500/30
+           disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .date-field.is-disabled { @apply opacity-60; }
 }
 
 @layer utilities {

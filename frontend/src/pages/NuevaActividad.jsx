@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { actividadesApi } from '../api/actividades'
 import { catalogosApi } from '../api/catalogos'
+import DateField from '../components/admin/DateField.jsx'
 import { today } from '../lib/format'
 
 export default function NuevaActividad() {
@@ -125,7 +126,7 @@ export default function NuevaActividad() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Fecha de trabajo *</label>
-              <input type="date" className="input" value={fecha} onChange={(e) => setFecha(e.target.value)} required />
+              <DateField value={fecha} onChange={(e) => setFecha(e.target.value)} required />
             </div>
             <div>
               <label className="label">Contrato / Proyecto *</label>

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { actividadesApi } from '../api/actividades'
 import { today, fmtHM, minutosToHoras } from '../lib/format'
 import { useAuthStore } from '../store/auth'
+import DateField from '../components/admin/DateField.jsx'
 import EditarActividadModal from '../components/EditarActividadModal.jsx'
 
 const estadoStyles = {
@@ -116,7 +117,7 @@ export default function Tareo() {
 
         <div className="card">
           <label className="label">Fecha</label>
-          <input type="date" className="input" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          <DateField value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </div>
 
         {error && <div className="rounded-md bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>}
@@ -175,7 +176,7 @@ export default function Tareo() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="label">Fecha</label>
-            <input type="date" className="input" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            <DateField value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </div>
           <div className="sm:col-span-2">
             <label className="label">Filtrar</label>

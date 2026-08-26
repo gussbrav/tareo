@@ -98,4 +98,8 @@ export const Icon = {
     <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
     <path d="M21 3v5h-5M3 21v-5h5" />
   </>),
+  Calendar: wrap(<>
+    <rect x="3" y="4" width="18" height="17" rx="2" />
+    <path d="M16 2v4M8 2v4M3 10h18" />
+  </>),
 }
