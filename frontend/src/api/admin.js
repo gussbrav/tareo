@@ -40,5 +40,9 @@ export const adminApi = {
     downloadTemplate: () =>
       api.get('/api/admin/proyectos/ceco-template', { responseType: 'blob' })
         .then((r) => r.data),
+    // Descarga blob con el estado actual de la jerarquía del proyecto (respaldo/edición)
+    downloadSnapshot: (proyectoId) =>
+      api.get(`/api/admin/proyectos/${proyectoId}/export-cecos`, { responseType: 'blob' })
+        .then((r) => r.data),
   },
 }

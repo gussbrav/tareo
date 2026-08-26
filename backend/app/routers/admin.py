@@ -4,8 +4,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, EmailStr, Field
+from psycopg2.errors import UniqueViolation
 
-from app.services.ceco_importer import build_template_xlsx, parse_ceco_workbook, import_to_proyecto
+from app.services.ceco_importer import (
+    build_template_xlsx,
+    build_snapshot_xlsx,
+    parse_ceco_workbook,
+    import_to_proyecto,
+)
 
 from app.auth.dependencies import require_role
 from app.auth.password import hash_password
@@ -538,14 +544,59 @@ def list_proyectos():
     return _crud_list("construccion.m_proyecto", "sort_order, codproyecto")
 
 
+def _check_codproyecto_unique(codproyecto: int, exclude_id: Optional[UUID] = None) -> None:
+    """Rechaza temprano con 409 si el código ya existe en otro proyecto.
+    El UNIQUE INDEX en DB (V013) es el safety net final."""
+    with get_db() as conn, conn.cursor() as cur:
+        if exclude_id:
+            cur.execute(
+                "SELECT descontratoproyecto FROM construccion.m_proyecto"
+                " WHERE codproyecto = %s AND id <> %s LIMIT 1;",
+                (codproyecto, str(exclude_id)),
+            )
+        else:
+            cur.execute(
+                "SELECT descontratoproyecto FROM construccion.m_proyecto"
+                " WHERE codproyecto = %s LIMIT 1;",
+                (codproyecto,),
+            )
+        existing = cur.fetchone()
+    if existing:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"El código {codproyecto} ya está usado por el proyecto "
+            f"'{existing['descontratoproyecto'] or '(sin contrato)'}'. "
+            f"Elige otro código.",
+        )
+
+
 @router.post("/proyectos", status_code=201)
 def create_proyecto(payload: ProyectoCreate):
-    return _crud_insert("construccion.m_proyecto", payload.model_dump())
+    _check_codproyecto_unique(payload.codproyecto)
+    try:
+        return _crud_insert("construccion.m_proyecto", payload.model_dump())
+    except UniqueViolation:
+        # Safety net contra race condition (dos admins creando simultáneo).
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"El código {payload.codproyecto} fue tomado por otro usuario "
+            f"al mismo tiempo. Elige otro código.",
+        )
 
 
 @router.patch("/proyectos/{proy_id}")
 def update_proyecto(proy_id: UUID, payload: ProyectoUpdate):
-    return _crud_update("construccion.m_proyecto", proy_id, payload.model_dump(exclude_none=True))
+    data = payload.model_dump(exclude_none=True)
+    if "codproyecto" in data:
+        _check_codproyecto_unique(data["codproyecto"], exclude_id=proy_id)
+    try:
+        return _crud_update("construccion.m_proyecto", proy_id, data)
+    except UniqueViolation:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"El código {data.get('codproyecto')} fue tomado por otro usuario "
+            f"al mismo tiempo. Elige otro código.",
+        )
 
 
 @router.delete("/proyectos/{proy_id}", status_code=204)
@@ -603,6 +654,24 @@ def download_ceco_template():
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": 'attachment; filename="template_cecos_azoramind.xlsx"',
+        },
+    )
+
+
+@router.get("/proyectos/{proyecto_id}/export-cecos")
+def export_ceco_snapshot(proyecto_id: UUID):
+    """Descarga la jerarquía Área/Especialidad/CC ACTUAL del proyecto como
+    Excel, en el mismo formato que el template. Sirve para:
+      - Respaldo (si perdés el Excel original)
+      - Editar offline y re-importar (idempotente, actualiza por código)
+      - Auditar el estado de la configuración
+    """
+    xlsx_bytes = build_snapshot_xlsx(proyecto_id)
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f'attachment; filename="cecos_proyecto_{proyecto_id}.xlsx"',
         },
     )
 

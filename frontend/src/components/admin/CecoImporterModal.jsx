@@ -23,24 +23,47 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
+  const [downloadingSnapshot, setDownloadingSnapshot] = useState(false)
+
+  // Helper — dispara la descarga de un Blob como archivo del cliente.
+  const saveBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   const handleDownloadTemplate = async () => {
     setError('')
     setDownloadingTemplate(true)
     try {
       const blob = await adminApi.cecoImporter.downloadTemplate()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'template_cecos_azoramind.xlsx'
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      saveBlob(blob, 'template_cecos_azoramind.xlsx')
     } catch (err) {
       setError('No se pudo descargar el template. Reinténtalo en un momento.')
     } finally {
       setDownloadingTemplate(false)
+    }
+  }
+
+  const handleDownloadSnapshot = async () => {
+    if (!proyecto?.id) return
+    setError('')
+    setDownloadingSnapshot(true)
+    try {
+      const blob = await adminApi.cecoImporter.downloadSnapshot(proyecto.id)
+      const safeName = (proyecto.descontratoproyecto || proyecto.nbrproyecto || proyecto.id)
+        .toString()
+        .replace(/[^a-z0-9_-]+/gi, '_')
+      saveBlob(blob, `cecos_${safeName}.xlsx`)
+    } catch (err) {
+      setError('No se pudo descargar el estado actual. Reinténtalo en un momento.')
+    } finally {
+      setDownloadingSnapshot(false)
     }
   }
 
@@ -105,7 +128,7 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
       <div className="p-5 space-y-4">
         {phase === 'idle' && (
           <>
-            {/* Banner del template para que el usuario sepa el formato exacto */}
+            {/* Banner del template — para primera carga */}
             <div className="rounded-lg bg-brand-50 border border-brand-100 p-3 flex items-start gap-3">
               <div className="w-8 h-8 rounded-md bg-white border border-brand-200 flex items-center justify-center shrink-0">
                 <Icon.General className="w-4 h-4 text-brand-600" />
@@ -125,6 +148,29 @@ export default function CecoImporterModal({ open, onClose, proyecto, onImported 
               >
                 <Icon.ArrowDown className="w-4 h-4" />
                 {downloadingTemplate ? 'Descargando…' : 'Descargar template'}
+              </button>
+            </div>
+
+            {/* Banner de snapshot — para respaldar/editar la config actual */}
+            <div className="rounded-lg bg-emerald-50 border border-emerald-100 p-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-md bg-white border border-emerald-200 flex items-center justify-center shrink-0">
+                <Icon.Archive className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-slate-800">¿Ya tienes CECOs cargados?</p>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Descarga la configuración actual como Excel para respaldarla o editarla
+                  offline. Cuando la vuelvas a subir, se actualiza sin duplicar.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary btn-sm shrink-0"
+                onClick={handleDownloadSnapshot}
+                disabled={downloadingSnapshot || !proyecto?.id}
+              >
+                <Icon.ArrowDown className="w-4 h-4" />
+                {downloadingSnapshot ? 'Descargando…' : 'Descargar Excel actual'}
               </button>
             </div>
 

@@ -368,6 +368,116 @@ def build_template_xlsx() -> bytes:
     return buf.getvalue()
 
 
+def build_snapshot_xlsx(proyecto_id: UUID) -> bytes:
+    """Genera un Excel con el ESTADO ACTUAL de la jerarquía Área/Especialidad/CC
+    de un proyecto, en el MISMO formato que el template — para que el admin
+    pueda descargar, editar y re-importar (o guardar como respaldo).
+
+    Cero riesgo de perder configuración: el admin siempre tiene un file
+    exportable de lo que hay hoy en la DB, sin depender del Excel original.
+    """
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    # Query jerarquía completa en un solo round-trip.
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT descontratoproyecto, nbrproyecto, codproyecto"
+            " FROM construccion.m_proyecto WHERE id = %s;",
+            (str(proyecto_id),),
+        )
+        proy = cur.fetchone()
+        if not proy:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Proyecto no encontrado")
+
+        cur.execute(
+            """
+            SELECT a.codarea, a.nbrarea,
+                   e.codespecialidad, e.nbrespecialidad,
+                   c.codcentrocosto, c.nbrcentrocosto,
+                   c.tipocentrocosto, c.codigo_ceco, c.descentrocosto
+              FROM construccion.m_area a
+              LEFT JOIN construccion.m_especialidad e
+                     ON e.area_id = a.id AND e.flgactivoespecialidad = true
+              LEFT JOIN construccion.m_centrocosto c
+                     ON c.especialidad_id = e.id AND c.flgactivocentrocosto = true
+             WHERE a.proyecto_id = %s AND a.flgactivoarea = true
+             ORDER BY a.codarea::int, e.codespecialidad::int NULLS LAST,
+                      c.codcentrocosto::int NULLS LAST;
+            """,
+            (str(proyecto_id),),
+        )
+        rows = cur.fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "CecoAzoramind"
+
+    headers = [
+        "Cod01", "Area",
+        "Cod02", "Especialidad",
+        "Cod03", "CentroCosto",
+        "TipoCosto", "CodigoCeco", "Descripcion",
+    ]
+    ws.append(headers)
+
+    # Mismo estilo de header que el template (consistencia visual).
+    header_fill = PatternFill(start_color="1E40AF", end_color="1E40AF", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_align = Alignment(horizontal="left", vertical="center", wrap_text=False)
+    for col_idx in range(1, len(headers) + 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_align
+    ws.row_dimensions[1].height = 22
+
+    for r in rows:
+        ws.append([
+            r["codarea"],
+            r["nbrarea"],
+            r["codespecialidad"] or "",
+            r["nbrespecialidad"] or "",
+            r["codcentrocosto"] or "",
+            r["nbrcentrocosto"] or "",
+            r["tipocentrocosto"] or "",
+            r["codigo_ceco"] or "",
+            r["descentrocosto"] or "",
+        ])
+
+    widths = [7, 32, 7, 30, 7, 26, 22, 12, 30]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.freeze_panes = "A2"
+
+    # Metadata en hoja aparte — ayuda a identificar el snapshot al reabrirlo.
+    from datetime import datetime
+    ws2 = wb.create_sheet(title="Info")
+    proy_label = proy["descontratoproyecto"] or proy["nbrproyecto"] or f"Código {proy['codproyecto']}"
+    info = [
+        ["Snapshot de configuración — Azoramind Tareo"],
+        [""],
+        ["Proyecto", proy_label],
+        ["Código proyecto", proy["codproyecto"]],
+        ["Filas exportadas", len(rows)],
+        ["Generado", datetime.now().strftime("%Y-%m-%d %H:%M")],
+        [""],
+        ["Este archivo puede editarse y re-importarse en Configuración → Áreas → Importar Excel."],
+        ["La importación es idempotente: actualiza los códigos existentes y agrega los nuevos."],
+    ]
+    for row in info:
+        ws2.append(row)
+    ws2.cell(row=1, column=1).font = Font(bold=True, size=14, color="1E40AF")
+    ws2.column_dimensions["A"].width = 22
+    ws2.column_dimensions["B"].width = 60
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
 def import_to_proyecto(proyecto_id: UUID, parsed: Dict[str, Any]) -> Dict[str, Any]:
     """Aplica el parseado a un proyecto. Idempotente + transaccional.
 

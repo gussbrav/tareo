@@ -44,7 +44,11 @@ export default function AdminMasterTable({
   injectProyectoAs,
   showCecoImporter = false,
   optionsAsyncArgs = [],
+  notifyEvent, // opcional: nombre del CustomEvent a disparar tras cualquier mutación (create/update/delete)
 }) {
+  const notify = () => {
+    if (notifyEvent) window.dispatchEvent(new CustomEvent(notifyEvent))
+  }
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -121,6 +125,7 @@ export default function AdminMasterTable({
       else await api.update(editing, payload)
       close()
       load()
+      notify()
     } catch (err) {
       setError(err.response?.data?.detail || 'No se pudo guardar')
     } finally {
@@ -138,6 +143,7 @@ export default function AdminMasterTable({
     if (!confirmingDelete) return
     await api.remove(confirmingDelete.id)
     load()
+    notify()
   }
 
   const handleReorder = async (newItems) => {

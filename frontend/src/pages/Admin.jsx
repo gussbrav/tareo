@@ -133,6 +133,10 @@ const proyectosConfig = {
   title: 'Proyectos',
   singular: 'proyecto',
   countLabel: 'proyectos',
+  // Cada mutación dispara el evento — el ProyectoScopeBar de los tabs
+  // por-proyecto lo escucha y refetch la lista de proyectos activos.
+  // Sin esto, un proyecto recién creado no aparecía en el dropdown de Áreas.
+  notifyEvent: 'tareo:proyectos-updated',
   searchKeys: ['nbrproyecto', 'descontratoproyecto', 'cliproyecto', 'codproyecto'],
   deleteFlagField: 'flgactivoproyecto',
   columns: [
@@ -223,21 +227,28 @@ export default function Admin() {
     else localStorage.removeItem(SCOPE_STORAGE_KEY)
   }
 
-  // Carga la lista de proyectos activos (para el selector)
+  // Carga la lista de proyectos activos (para el selector).
+  // Reacciona al evento "tareo:proyectos-updated" que dispara el CRUD de
+  // Proyectos cuando se crea/edita/elimina uno — así el dropdown de los
+  // tabs por-proyecto (Áreas / Especialidades / CC) siempre refleja la
+  // realidad sin necesitar F5.
   useEffect(() => {
-    adminApi.proyectos.list()
-      .then((rs) => {
-        const activos = rs.filter((p) => p.flgactivoproyecto)
-        setProyectos(activos)
-        // Auto-selecciona el primero si no hay uno elegido y no existe el guardado
-        setScopeProyectoIdState((prev) => {
-          if (prev && activos.some((p) => p.id === prev)) return prev
-          const first = activos[0]?.id || null
-          if (first) localStorage.setItem(SCOPE_STORAGE_KEY, first)
-          return first
+    const load = () =>
+      adminApi.proyectos.list()
+        .then((rs) => {
+          const activos = rs.filter((p) => p.flgactivoproyecto)
+          setProyectos(activos)
+          setScopeProyectoIdState((prev) => {
+            if (prev && activos.some((p) => p.id === prev)) return prev
+            const first = activos[0]?.id || null
+            if (first) localStorage.setItem(SCOPE_STORAGE_KEY, first)
+            return first
+          })
         })
-      })
-      .catch(() => {})
+        .catch(() => {})
+    load()
+    window.addEventListener('tareo:proyectos-updated', load)
+    return () => window.removeEventListener('tareo:proyectos-updated', load)
   }, [])
 
   const proyectoActivo = useMemo(
