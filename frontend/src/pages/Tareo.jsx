@@ -379,7 +379,7 @@ export default function Tareo() {
         </ul>
       )}
 
-      {pages > 1 && (
+      {total > 0 && (
         <Paginator
           page={page}
           pages={pages}
@@ -440,30 +440,31 @@ function Paginator({ page, pages, total, size, onPageChange, disabled }) {
   const canPrev = page > 1 && !disabled
   const canNext = page < pages && !disabled
   return (
-    <div className="flex items-center justify-between text-sm text-slate-600 pt-1">
+    <div className="flex items-center justify-end gap-3 text-sm text-slate-500 pt-1">
       <span className="tabular-nums">
-        Mostrando <strong className="text-slate-900">{from}–{to}</strong> de{' '}
-        <strong className="text-slate-900">{total}</strong>
+        {from}–{to} de{' '}
+        <strong className="font-medium text-slate-900">
+          {total.toLocaleString('es-PE')}
+        </strong>
       </span>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <button
-          className="btn-secondary btn-sm"
+          type="button"
           onClick={() => onPageChange(page - 1)}
           disabled={!canPrev}
           aria-label="Página anterior"
+          className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
         >
-          ← Anterior
+          <Icon.ChevronLeft className="w-4 h-4" />
         </button>
-        <span className="px-3 text-xs text-slate-500 tabular-nums">
-          Página {page} de {pages}
-        </span>
         <button
-          className="btn-secondary btn-sm"
+          type="button"
           onClick={() => onPageChange(page + 1)}
           disabled={!canNext}
           aria-label="Página siguiente"
+          className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors"
         >
-          Siguiente →
+          <Icon.ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>
