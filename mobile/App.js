@@ -2,7 +2,7 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import AgendaScreen from './src/screens/AgendaScreen'
@@ -19,49 +19,13 @@ import Icon from './src/ui/Icons'
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
-const TareoStack = createNativeStackNavigator()
 
-// ─── Stack anidado para las pantallas que suben modales sobre "Tareo" ─────
-function TareoStackNav() {
-  return (
-    <TareoStack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text.primary,
-        headerTitleStyle: { fontWeight: '700' },
-        headerShadowVisible: false,
-      }}
-    >
-      <TareoStack.Screen
-        name="Agenda"
-        component={AgendaScreen}
-        options={{ title: 'Agenda' }}
-      />
-      <TareoStack.Screen
-        name="Tareo"
-        component={TareoScreen}
-        options={{ title: 'Vista simple' }}
-      />
-      <TareoStack.Screen
-        name="NuevaActividad"
-        component={NuevaActividadScreen}
-        options={{ title: 'Nueva actividad', presentation: 'modal' }}
-      />
-      <TareoStack.Screen
-        name="EditarActividad"
-        component={EditarActividadScreen}
-        options={{ title: 'Editar actividad' }}
-      />
-    </TareoStack.Navigator>
-  )
-}
-
-// ─── Icono para tab bar (SVG outline, family Lucide-style) ────────────────
+// ─── Icono para tab bar ───────────────────────────────────────────────────
 const ICON_NAME = {
   Home: 'home',
-  TareoStack: 'calendar',
-  Reportes: 'barChart',
-  Mas: 'dotsHorizontal',
+  Tareo: 'list',
+  Agenda: 'calendar',
+  Mas: 'layoutGrid',
 }
 
 function TabIcon({ name, focused, isFab }) {
@@ -86,9 +50,8 @@ function TabIcon({ name, focused, isFab }) {
 
 // ─── Bottom Tab Navigator ─────────────────────────────────────────────────
 function MainTabs() {
-  const canCreate =
-    useAuthStore((s) => s.user?.role) === 'admin' ||
-    useAuthStore((s) => s.user?.role) === 'supervisor'
+  const role = useAuthStore((s) => s.user?.role)
+  const canCreate = role === 'admin' || role === 'supervisor'
 
   return (
     <Tab.Navigator
@@ -100,7 +63,6 @@ function MainTabs() {
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabItem,
         tabBarLabelStyle: styles.tabLabel,
-        tabBarButtonTestID: 'tab',
       }}
     >
       <Tab.Screen
@@ -112,11 +74,11 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="TareoStack"
-        component={TareoStackNav}
+        name="Tareo"
+        component={TareoScreen}
         options={{
-          title: 'Agenda',
-          tabBarIcon: ({ focused }) => <TabIcon name="TareoStack" focused={focused} />,
+          title: 'Tareo',
+          tabBarIcon: ({ focused }) => <TabIcon name="Tareo" focused={focused} />,
         }}
       />
       {canCreate && (
@@ -124,11 +86,7 @@ function MainTabs() {
           name="Nueva"
           component={NuevaActividadScreen}
           options={{
-            // Label del tab: "Actividad" comunica el objeto que se crea.
-            // "Nueva" solo era ambiguo — el trabajador no sabía qué era.
             title: 'Actividad',
-            // Header visible dentro del tab para dar contexto — sin el
-            // usuario aterriza en el formulario sin saber dónde está.
             headerShown: true,
             headerTitle: 'Nueva actividad',
             headerTitleStyle: { fontWeight: '700', color: colors.text.primary },
@@ -139,11 +97,11 @@ function MainTabs() {
         />
       )}
       <Tab.Screen
-        name="Reportes"
-        component={ReportesScreen}
+        name="Agenda"
+        component={AgendaScreen}
         options={{
-          title: 'Reportes',
-          tabBarIcon: ({ focused }) => <TabIcon name="Reportes" focused={focused} />,
+          title: 'Agenda',
+          tabBarIcon: ({ focused }) => <TabIcon name="Agenda" focused={focused} />,
         }}
       />
       <Tab.Screen
@@ -178,11 +136,30 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.text.primary,
+            headerTitleStyle: { fontWeight: '700' },
+            headerShadowVisible: false,
+          }}
+        >
           {accessToken ? (
-            <Stack.Screen name="Main" component={MainTabs} />
+            <>
+              <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+              <Stack.Screen
+                name="EditarActividad"
+                component={EditarActividadScreen}
+                options={{ title: 'Editar actividad' }}
+              />
+              <Stack.Screen
+                name="Reportes"
+                component={ReportesScreen}
+                options={{ title: 'Reportes' }}
+              />
+            </>
           ) : (
-            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           )}
         </Stack.Navigator>
       </NavigationContainer>
@@ -193,32 +170,30 @@ export default function App() {
 const styles = StyleSheet.create({
   splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand[600] },
   tabBar: {
-    height: 68,
-    paddingBottom: 8,
-    paddingTop: 6,
+    height: 72,
+    paddingBottom: 10,
+    paddingTop: 8,
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     ...shadow.tabBar,
   },
   tabItem: { paddingVertical: 4 },
-  tabLabel: { ...type.caption, fontSize: 11, fontWeight: '600', marginTop: 2 },
+  tabLabel: { ...type.caption, fontSize: 11, fontWeight: '600', marginTop: 3, letterSpacing: 0.1 },
   iconWrap: {
-    width: 40, height: 28,
+    width: 44, height: 30,
     alignItems: 'center', justifyContent: 'center',
     borderRadius: radius.pill,
   },
   iconWrapActive: {
     backgroundColor: colors.brand[50],
   },
-  iconGlyph: { fontSize: 20, fontWeight: '600', lineHeight: 22 },
   fab: {
-    width: 52, height: 52,
-    borderRadius: 26,
+    width: 54, height: 54,
+    borderRadius: 27,
     backgroundColor: colors.brand[600],
     alignItems: 'center', justifyContent: 'center',
-    marginTop: -18,
+    marginTop: -20,
     ...shadow.floating,
   },
-  fabIcon: { color: colors.text.inverse, fontSize: 28, fontWeight: '600', lineHeight: 30, marginTop: -2 },
 })

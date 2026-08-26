@@ -65,9 +65,8 @@ export default function ReportesScreen() {
   const maxHorasCc  = cc[0]?.horas || 1
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Reportes</Text>
         <Text style={styles.subtitle}>Ranking de horas trabajadas</Text>
       </View>
 

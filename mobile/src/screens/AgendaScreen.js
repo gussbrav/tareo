@@ -27,6 +27,9 @@ import { colors, radius, shadow, spacing, type } from '../theme'
 import Icon from '../ui/Icons'
 
 const DIAS_CORTOS = ['D', 'L', 'M', 'X', 'J', 'V', 'S']
+const DIAS_LARGOS = [
+  'Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado',
+]
 const MESES = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
@@ -105,8 +108,9 @@ export default function AgendaScreen({ navigation }) {
 
   const week = useMemo(() => weekOf(new Date(selected + 'T12:00:00')), [selected])
   const selectedActs = actsByDay[selected] || []
-  const [selY, selM, selD] = selected.split('-').map(Number)
-  const headerLabel = `${selD} de ${MESES[selM - 1]}`
+  const selDateObj = useMemo(() => new Date(selected + 'T12:00:00'), [selected])
+  const dow = DIAS_LARGOS[selDateObj.getDay()]
+  const headerLabel = `${dow} ${selDateObj.getDate()} de ${MESES[selDateObj.getMonth()]}`
 
   const goToday = () => setSelected(todayIso())
   const shiftWeek = (delta) => {
@@ -116,7 +120,7 @@ export default function AgendaScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       {/* Header: título + navegación */}
       <View style={styles.header}>
         <View style={{ flex: 1 }}>

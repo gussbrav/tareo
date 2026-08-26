@@ -17,12 +17,12 @@ import { api } from '../api/client'
 import { useAuthStore } from '../store/auth'
 import { colors, radius, shadow, spacing, type } from '../theme'
 
-const APP_VERSION = '0.5.2'
+const APP_VERSION = '0.6.0'
 const WEB_BASE =
   Constants.expoConfig?.extra?.apiBaseUrl?.replace(/\/$/, '') ||
   'https://tareo.azoramind.com'
 
-export default function MasScreen() {
+export default function MasScreen({ navigation }) {
   const { user, refreshToken, logout } = useAuthStore()
   const isAdmin = user?.role === 'admin'
 
@@ -65,6 +65,13 @@ export default function MasScreen() {
   }
 
   const generalItems = [
+    {
+      key: 'reportes',
+      icon: 'barChart',
+      label: 'Reportes',
+      hint: 'Ranking de horas y trabajadores',
+      onPress: () => navigation.navigate('Reportes'),
+    },
     {
       key: 'perfil',
       icon: 'user',

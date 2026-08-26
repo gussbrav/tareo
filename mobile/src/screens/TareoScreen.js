@@ -80,7 +80,7 @@ export default function TareoScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.dateBar}>
         <Pressable
           onPress={() => changeDay(-1)}
